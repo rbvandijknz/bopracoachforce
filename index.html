@@ -113,6 +113,9 @@
                 case 'sessionFeedback':
                     root.appendChild(SessionFeedbackScreen());
                     break;
+                case 'athleteFeedback':
+                    root.appendChild(AthleteFeedbackScreen());
+                    break;
                 case 'coachList':
                 default:
                     root.appendChild(CoachListScreen());
@@ -126,6 +129,7 @@
         window.handleNewSession = () => setState({ selectedSession: null, currentView: 'sessionFeedback' });
         window.handleBack = () => {
             if (state.currentView === 'sessionFeedback') setState({ currentView: 'coachDetail' });
+            else if (state.currentView === 'athleteFeedback') setState({ currentView: 'sessionFeedback' });
             else if (state.currentView === 'coachDetail') setState({ currentView: 'coachList', selectedCoachId: null });
         };
        
@@ -133,11 +137,22 @@
             const coachRef = doc(db, 'coaches', state.selectedCoachId);
             const coachToUpdate = state.coaches[state.selectedCoachId];
             const sessionIndex = coachToUpdate.sessions.findIndex(s => s.id === sessionData.id);
-            let updatedSessions = sessionIndex > -1 
-                ? coachToUpdate.sessions.map(s => s.id === sessionData.id ? sessionData : s)
-                : [...coachToUpdate.sessions, sessionData];
+            let updatedSessions;
+
+            if (sessionIndex > -1) {
+                // Update existing session
+                updatedSessions = coachToUpdate.sessions.map(s => s.id === sessionData.id ? sessionData : s);
+            } else {
+                // Add new session
+                updatedSessions = [...coachToUpdate.sessions, sessionData];
+            }
+            
             await updateDoc(coachRef, { sessions: updatedSessions });
-            setState({ currentView: 'coachDetail' });
+            
+            // Go back to coach detail view after saving
+            if (state.currentView !== 'coachDetail') {
+                 setState({ currentView: 'coachDetail' });
+            }
         };
         
         window.handleDeleteCoach = async (coachId, coachName) => {
@@ -170,6 +185,22 @@
                 alert("Failed to save goals. Please try again.");
             }
         };
+
+        window.handleGetAthleteFeedback = () => {
+            setState({ currentView: 'athleteFeedback' });
+        };
+
+        window.handleSaveAthleteFeedback = async () => {
+            const feedbackText = document.getElementById('athlete-feedback-textarea').value;
+            const currentSession = state.selectedSession;
+            currentSession.athleteFeedback = feedbackText;
+
+            // Immediately save this change back to the main session data
+            await handleSaveSession(currentSession);
+            // Go back to the session feedback screen
+            setState({ currentView: 'sessionFeedback', selectedSession: currentSession });
+        };
+
 
         // --- "COMPONENTS" (DOM element factories) ---
         function LoginScreen() {
@@ -255,7 +286,7 @@
                                 <div>
                                     <h3 class="text-lg font-semibold text-gray-900">${coach.name}</h3>
                                     <p class="text-sm text-gray-600">${coach.club || 'No club assigned'}</p>
-                                    <p class="text-xs text-gray-400 mt-1">${coach.sessions.length} session${coach.sessions.length !== 1 ? 's' : ''} recorded</p>
+                                    <p class="text-xs text-gray-400 mt-1">${(coach.sessions || []).length} session${(coach.sessions || []).length !== 1 ? 's' : ''} recorded</p>
                                 </div>
                             </div>
                             <button onclick="handleDeleteCoach('${id}', '${coach.name}')" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors flex-shrink-0">
@@ -302,7 +333,7 @@
                         </button>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        ${coach.sessions.length > 0 ? coach.sessions.sort((a,b) => new Date(b.date) - new Date(a.date)).map(session => `
+                        ${(coach.sessions || []).length > 0 ? (coach.sessions || []).sort((a,b) => new Date(b.date) - new Date(a.date)).map(session => `
                             <div onclick='handleSelectSession(${JSON.stringify(session)})' class="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer">
                                 <p class="font-semibold text-gray-900">Session: ${new Date(session.date).toLocaleDateString('en-NZ', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                                 <p class="text-sm text-gray-600 mt-1">Focus: ${session.focus}</p>
@@ -314,11 +345,11 @@
             // Render Chart
             setTimeout(() => {
                 const chartContainer = document.getElementById('chart-container');
-                if (chartContainer && coach.sessions.length > 0) {
+                if (chartContainer && (coach.sessions || []).length > 0) {
                      const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = window.Recharts;
-                     const chartData = coach.sessions.map(session => {
+                     const chartData = (coach.sessions || []).map(session => {
                         const sessionData = { date: new Date(session.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) };
-                        session.feedback.forEach(fb => { sessionData[fb.category] = fb.score; });
+                        (session.feedback || []).forEach(fb => { sessionData[fb.category] = fb.score; });
                         return sessionData;
                      });
                      const categories = Object.keys(rubricData);
@@ -354,7 +385,7 @@
              let session = state.selectedSession || {
                 id: `session-${Date.now()}`, date: new Date().toISOString().split('T')[0], focus: '',
                 feedback: Object.keys(rubricData).map(cat => ({ category: cat, score: null, comments: '' })),
-                summary: '', actionPlan: ''
+                summary: '', actionPlan: '', athleteFeedback: ''
              };
              
              el.innerHTML = `
@@ -369,9 +400,16 @@
                 const formContainer = document.getElementById('session-form');
                 if(!formContainer) return;
                 
+                const athleteFeedbackButtonHTML = session.athleteFeedback 
+                    ? `<button onclick="handleGetAthleteFeedback()" class="bg-green-100 text-green-800 font-bold py-2 px-4 rounded-lg hover:bg-green-200 transition-colors flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        View Athlete Feedback
+                       </button>`
+                    : `<button onclick="handleGetAthleteFeedback()" class="bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors">Get Athlete Feedback</button>`;
+
                 const formHTML = `
                     <div class="bg-white p-6 rounded-lg shadow mb-6">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
                             <div>
                                 <label for="date" class="font-medium text-gray-700 block mb-2">Session Date:</label>
                                 <input type="date" name="date" value="${session.date}" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#00a99d] focus:border-[#00a99d] transition" />
@@ -380,10 +418,13 @@
                                 <label for="focus" class="font-medium text-gray-700 block mb-2">Session Focus:</label>
                                 <input type="text" name="focus" value="${session.focus}" placeholder="e.g., Technical drills, race prep" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#00a99d] focus:border-[#00a99d] transition" />
                             </div>
+                            <div class="md:col-span-2">
+                                ${athleteFeedbackButtonHTML}
+                            </div>
                         </div>
                     </div>
                     ${Object.entries(rubricData).map(([category, data]) => {
-                        const currentFeedback = session.feedback.find(f => f.category === category) || { score: -1, comments: "" };
+                        const currentFeedback = (session.feedback || []).find(f => f.category === category) || { score: -1, comments: "" };
                         return `
                         <div class="bg-white p-6 rounded-lg shadow mb-4">
                             <h3 class="text-xl font-semibold text-gray-800">${category}</h3>
@@ -401,11 +442,11 @@
                         <h3 class="text-xl font-semibold text-gray-800 mb-4">Session Summary</h3>
                         <div>
                             <label for="summary" class="font-medium text-gray-700 block mb-2">Key Takeaways:</label>
-                            <textarea name="summary" rows="4" class="w-full p-2 border border-gray-300 rounded-md">${session.summary}</textarea>
+                            <textarea name="summary" rows="4" class="w-full p-2 border border-gray-300 rounded-md">${session.summary || ''}</textarea>
                          </div>
                          <div class="mt-4">
                             <label for="actionPlan" class="font-medium text-gray-700 block mb-2">Action Plan / Next Steps:</label>
-                            <textarea name="actionPlan" rows="4" class="w-full p-2 border border-gray-300 rounded-md">${session.actionPlan}</textarea>
+                            <textarea name="actionPlan" rows="4" class="w-full p-2 border border-gray-300 rounded-md">${session.actionPlan || ''}</textarea>
                          </div>
                     </div>
                     <div class="mt-8 flex justify-end">
@@ -449,6 +490,37 @@
 
              return el;
         }
+
+        function AthleteFeedbackScreen() {
+            const el = document.createElement('div');
+            el.className = 'p-4 md:p-8';
+            const coach = state.coaches[state.selectedCoachId];
+            const session = state.selectedSession;
+
+            el.innerHTML = `
+                ${Header({ title: `Athlete Feedback`, onBack: 'handleBack()' })}
+                <main class="mt-8 max-w-4xl mx-auto">
+                     <div class="bg-white p-6 rounded-lg shadow text-center">
+                        <h2 class="text-2xl font-bold text-gray-800">Feedback for ${coach.name}</h2>
+                        <p class="text-gray-600 mt-1">Session on ${new Date(session.date).toLocaleDateString('en-NZ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                        <p class="text-gray-600">Focus: ${session.focus}</p>
+                        
+                        <div class="mt-6 text-left">
+                            <label for="athlete-feedback-textarea" class="font-medium text-gray-700 block mb-2">Your Feedback:</label>
+                            <textarea id="athlete-feedback-textarea" class="w-full p-2 border border-gray-300 rounded-md h-48" placeholder="Please provide your honest feedback about the session...">${session.athleteFeedback || ''}</textarea>
+                        </div>
+
+                        <div class="mt-6">
+                            <button onclick="handleSaveAthleteFeedback()" class="bg-[#002d3c] text-white font-bold py-3 px-8 rounded-lg hover:bg-[#004e69] transition-colors text-lg">
+                                Save and Finish
+                            </button>
+                        </div>
+                     </div>
+                </main>
+            `;
+            return el;
+        }
+
 
         // --- INITIALIZATION ---
         let unsubscribe; // To hold the onSnapshot listener
