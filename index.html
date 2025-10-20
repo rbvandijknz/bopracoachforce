@@ -3,643 +3,340 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rowing Coach Feedback Tool</title>
-    <!-- Load Tailwind CSS -->
+    <title>Coach Feedback App</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load React and ReactDOM -->
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <!-- Load Babel for JSX compilation in the browser -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- V8 Firebase Modules: Highly stable global API for single-file deployment -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/recharts/umd/Recharts.min.js"></script>
     <style>
-        /* Define a custom font */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
-        }
+        body { font-family: 'Inter', sans-serif; }
     </style>
 </head>
-<body>
-    <div id="root">
-        <!-- React App will be mounted here -->
-    </div>
+<body class="bg-gray-50">
+    <div id="app"></div>
 
-    <!-- Main React Component and Logic -->
-    <script type="text/babel">
-        // --- Firebase V8 Access (Simple Global API) ---
-        // V8 Access to server timestamp
-        const serverTimestamp = () => firebase.firestore.FieldValue.serverTimestamp();
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 
-        // --- Lucide Icons Mock ---
-        const Clipboard = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="4" width="6" height="4" rx="1" /><path d="M10 20h4M12 20v-8M18 10h-2M6 10H4M16 10H8M21 10V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8zM12 14v4" /></svg>;
-        const Save = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /><path d="M12 17v-4h-4" /></svg>;
-        const Loader = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>;
-        const XCircle = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" /></svg>;
-        const Users = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>;
-        const Search = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>;
-        const FileText = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>;
-
-
-        const { useState, useEffect, useCallback, useMemo } = React;
-
-        // --- GLOBAL CONFIGURATION (EXTERNAL FIREBASE PROJECT) ---
-        const GH_PAGES_FIREBASE_CONFIG = {
-            apiKey: "AIzaSyAVbGWN3LclrUZMtv-L7x0D8HF7OQ3viK8", 
+        // --- FIREBASE CONFIGURATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAVbGWN3LclrUZMtv-L7x0D8HF7OQ3viK8",
             authDomain: "bopracoachfeedback.firebaseapp.com",
             projectId: "bopracoachfeedback",
-            storageBucket: "bopracoachfeedback.firebasestorage.app",
+            storageBucket: "bopracoachfeedback.appspot.com",
             messagingSenderId: "967552327697",
-            appId: "1:967552327697:web:f3a2e3ffa5d6c6a3f611b0"
+            appId: "1:967552327697:web:f3a2e3ffa5d6c6a3f611b0",
+            measurementId: "G-NRQ2HSJGT6"
+        };
+
+        // --- RUBRIC DATA ---
+        const rubricData = {
+          "Understands the Sport": { description: "(technical, tactical, rules)", levels: ["Open to learning sport-specific knowledge.", "Starting to notice techniques and rules in action.", "Beginning to apply knowledge of techniques and rules with athletes.", "Using sport knowledge intentionally with athletes.", "Adapting technical/tactical elements confidently.", "Mentoring and sharing sport knowledge with others."] },
+          "Understands Self": { description: "(leadership, philosophy, self-awareness, communication)", levels: ["Becoming aware of the coaching role and its impact.", "Noticing different coaching styles and effects.", "Starting to reflect on personal coaching style and values.", "Established a coaching philosophy and starting to implement.", "Adapting communication and coaching style to suit others' needs.", "Supporting others through clear, authentic leadership."] },
+          "Understands Environment": { description: "(culture, learning space)", levels: ["Beginning to consider how environment affects learning.", "Noticing group dynamics and inclusion opportunities.", "Trying new strategies to include and engage all athletes.", "Creating space that supports trust and growth.", "Shaping a positive culture through deliberate actions.", "Supporting athletes in co-creating a positive environment."] },
+          "Understands Learning": { description: "(reflection, planning, pedagogy/andragogy)", levels: ["Starting to think about how people learn.", "Noticing different learning preferences and athlete needs.", "Planning sessions with learning styles and athlete needs in mind (Athlete-centred).", "Adapting activities based on reflection and feedback.", "Applying learning theory with confidence.", "Designing learning based on individual needs and goals."] },
+          "Understands Development": { description: "(age & stage, feedback, development)", levels: ["Building awareness of how athletes develop.", "Reflecting on sessions relative to age and stage.", "Planning sessions with the development needs of age and stage in mind.", "Providing purposeful feedback and clear expectations relative to age and stage.", "Balancing support with challenge in meaningful ways.", "Transforming performance through reflective support."] }
+        };
+        const levelNames = ["Emerging", "Exploring", "Developing", "Applying", "Integrating", "Leading"];
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // --- APPLICATION STATE ---
+        let state = {
+            loading: true,
+            user: null,
+            coaches: {},
+            currentView: 'coachList', // coachList, coachDetail, sessionFeedback
+            selectedCoachId: null,
+            selectedSession: null,
         };
         
-        const firebaseConfig = GH_PAGES_FIREBASE_CONFIG;
-        const initialAuthToken = null; 
-        
-        // --- END GLOBAL CONFIGURATION ---
+        const root = document.getElementById('app');
 
-        
-        // Helper function to format Firestore data (especially timestamps)
-        const formatFeedbackData = (data) => {
-            const formattedData = { ...data };
-            if (formattedData.createdAt && formattedData.createdAt.toDate) {
-                formattedData.date = formattedData.createdAt.toDate().toISOString().split('T')[0];
+        // --- STATE MANAGEMENT & RENDERING ---
+        function setState(newState) {
+            state = { ...state, ...newState };
+            renderApp();
+        }
+
+        function renderApp() {
+            root.innerHTML = ''; // Clear the screen
+
+            if (state.loading) {
+                root.innerHTML = `<div class="flex justify-center items-center h-screen bg-gray-50">
+                    <svg class="animate-spin h-12 w-12 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p class="ml-4 text-lg text-gray-700">Loading Coach Data...</p>
+                </div>`;
+                return;
             }
-            // Ensure scores are numbers
-            for (const key in formattedData) {
-                if (rubricData.some(r => r.key === key) && formattedData[key].score !== undefined) {
-                    formattedData[key].score = Number(formattedData[key].score);
-                }
+
+            switch(state.currentView) {
+                case 'coachDetail':
+                    root.appendChild(CoachDetailScreen());
+                    break;
+                case 'sessionFeedback':
+                    root.appendChild(SessionFeedbackScreen());
+                    break;
+                case 'coachList':
+                default:
+                    root.appendChild(CoachListScreen());
+                    break;
             }
-            return formattedData;
+        }
+        
+        // --- DATA HANDLING & NAVIGATION ---
+        window.handleSelectCoach = (coachId) => setState({ selectedCoachId: coachId, currentView: 'coachDetail' });
+        window.handleSelectSession = (session) => setState({ selectedSession: session, currentView: 'sessionFeedback' });
+        window.handleNewSession = () => setState({ selectedSession: null, currentView: 'sessionFeedback' });
+        window.handleBack = () => {
+            if (state.currentView === 'sessionFeedback') setState({ currentView: 'coachDetail' });
+            else if (state.currentView === 'coachDetail') setState({ currentView: 'coachList', selectedCoachId: null });
+        };
+        window.handleAddNewCoach = async () => {
+            const name = prompt("Enter the new coach's name:");
+            if (name && state.user) {
+              await addDoc(collection(db, 'coaches'), { name, sessions: [], userId: state.user.uid });
+            }
+        };
+        window.handleSaveSession = async (sessionData) => {
+            const coachRef = doc(db, 'coaches', state.selectedCoachId);
+            const coachToUpdate = state.coaches[state.selectedCoachId];
+            const sessionIndex = coachToUpdate.sessions.findIndex(s => s.id === sessionData.id);
+            let updatedSessions = sessionIndex > -1 
+                ? coachToUpdate.sessions.map(s => s.id === sessionData.id ? sessionData : s)
+                : [...coachToUpdate.sessions, sessionData];
+            const updatedCoach = { ...coachToUpdate, sessions: updatedSessions };
+            delete updatedCoach.id;
+            await setDoc(coachRef, updatedCoach);
+            setState({ currentView: 'coachDetail' });
         };
 
-        // Rubric data structure remains the same
-        const rubricData = [
-        { key: 'UnderstandsSport', title: 'Understands the Sport', subtitle: '(Technical, Tactical, Rules)', levels: [ { score: 0, description: 'Open to Learning' }, { score: 1, description: 'Emerging (Starting to notice techniques and rules)' }, { score: 2, description: 'Exploring (Beginning to apply knowledge)' }, { score: 3, description: 'Applying (Using knowledge with intent)' }, { score: 4, description: 'Integrating (Adapting technical/tactical elements confidently)' }, { score: 5, description: 'Leading (Mentoring and sharing sport knowledge)' }, ]},
-        { key: 'UnderstandsSelf', title: 'Understands Self', subtitle: '(Leadership, Philosophy, Communication)', levels: [ { score: 0, description: 'Open to Learning' }, { score: 1, description: 'Emerging (Starting to reflect on personal style)' }, { score: 2, description: 'Exploring (Becoming aware of coaching role/impact)' }, { score: 3, description: 'Applying (Established philosophy and starting to implement)' }, { score: 4, description: 'Integrating (Adapting communication and style to suit others)' }, { score: 5, description: 'Leading (Supporting others through clear, authentic leadership)' }, ]},
-        { key: 'UnderstandsEnvironment', title: 'Understands Environment', subtitle: '(Culture, Learning Space)', levels: [ { score: 0, description: 'Open to Learning' }, { score: 1, description: 'Emerging (Trying new inclusion strategies, noticing dynamics)' }, { score: 2, description: 'Exploring (Beginning to consider environment effects)' }, { score: 3, description: 'Applying (Creating space that supports trust and growth)' }, { score: 4, description: 'Integrating (Shaping a positive culture through deliberate actions)' }, { score: 5, description: 'Leading (Supporting athletes in co-creating a positive environment)' }, ]},
-        { key: 'UnderstandsLearning', title: 'Understands Learning', subtitle: '(Reflection, Planning, Pedagogy)', levels: [ { score: 0, description: 'Open to Learning' }, { score: 1, description: 'Emerging (Starting to think about how people learn)' }, { score: 2, description: 'Exploring (Noticing different learning preferences)' }, { score: 3, description: 'Applying (Planning sessions with learning styles in mind - Athlete-centred)' }, { score: 4, description: 'Integrating (Adapting activities based on reflection and feedback)' }, { score: 5, description: 'Leading (Designing learning based on individual needs and goals)' }, ]},
-        { key: 'UnderstandsDevelopment', title: 'Understands Development', subtitle: '(Age & Stage, Feedback)', levels: [ { score: 0, description: 'Open to Learning' }, { score: 1, description: 'Emerging (Reflecting on sessions relative to age and stage)' }, { score: 2, description: 'Exploring (Building awareness of how athletes develop)' }, { score: 3, description: 'Applying (Providing purposeful feedback and clear expectations)' }, { score: 4, description: 'Integrating (Balancing support with challenge in meaningful ways)' }, { score: 5, description: 'Leading (Transforming performance through reflective support)' }, ]},
-        ];
-
-        const initialFeedbackState = {
-        coachName: '',
-        date: new Date().toISOString().split('T')[0],
-        sessionTopic: '',
-        ...Object.fromEntries(rubricData.map(item => [item.key, { score: 0, notes: '' }])),
-        actionPlan: '',
-        createdAt: null,
-        };
-
-        // --- Custom Components ---
-
-        const RubricRow = ({ category, feedback, updateFeedback }) => {
-        const { key, title, subtitle, levels } = category;
-        const { score, notes } = feedback[key] || {score: 0, notes: ''};
-
-        return (
-            <div className="border border-gray-200 p-4 rounded-xl shadow-md bg-white mb-6">
-            <h3 className="text-xl font-bold text-gray-800">{title}</h3>
-            <p className="text-sm text-indigo-600 mb-3">{subtitle}</p>
-
-            {/* Score Selection (Radio Group) */}
-            <div className="flex flex-wrap gap-2 mb-4 bg-indigo-500/10 p-2 rounded-lg">
-                {levels.map((level) => (
-                <button
-                    key={level.score}
-                    onClick={() => updateFeedback(key, 'score', level.score)}
-                    className={`flex-1 min-w-[50px] py-2 px-1 text-center font-semibold rounded-lg transition-all duration-200 ease-in-out border-2 ${
-                    score === level.score
-                        ? 'bg-indigo-700 text-white border-indigo-900 shadow-lg scale-[1.02]'
-                        : 'bg-white text-indigo-700 border-indigo-300 hover:bg-indigo-100'
-                    }`}
-                >
-                    {level.score}
-                </button>
-                ))}
-            </div>
-
-            {/* Current Level Description */}
-            <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-4">
-                <p className="font-semibold text-gray-600">Current Level ({score}):</p>
-                <p className="text-sm text-gray-800">
-                {levels.find(l => l.score === score)?.description || 'No score selected.'}
-                </p>
-            </div>
-
-            {/* Notes/Comments Textarea */}
-            <label htmlFor={`${key}-notes`} className="block text-sm font-medium text-gray-700 mb-1">
-                Examples, Reflections, and Comments:
-            </label>
-            <textarea
-                id={`${key}-notes`}
-                rows="4"
-                value={notes}
-                onChange={(e) => updateFeedback(key, 'notes', e.target.value)}
-                placeholder="Document specific examples and observations from the session..."
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base resize-none"
-            />
-            </div>
-        );
-        };
-
-        // --- Load Sessions Modal Component ---
-        const SessionLoaderModal = ({ isOpen, onClose, sessionsList, searchTerm, setSearchTerm, onLoadSessions, onSelectSession, isFetching }) => {
-            
-            const handleSearch = (e) => {
-                e.preventDefault();
-                onLoadSessions();
-            };
-            
-            return (
-                <div className={`fixed inset-0 z-50 overflow-y-auto ${isOpen ? 'block' : 'hidden'}`}>
-                    <div className="flex items-center justify-center min-h-screen p-4 text-center">
-                        <div className="fixed inset-0 transition-opacity bg-gray-900 bg-opacity-75" onClick={onClose}></div>
-                        
-                        <div className="inline-block w-full max-w-lg p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-xl">
-                            <h3 className="text-2xl font-bold leading-6 text-gray-900 flex items-center mb-4">
-                                <Search className="w-6 h-6 mr-2 text-indigo-600" />
-                                Load Existing Session
-                            </h3>
-                            
-                            <form onSubmit={handleSearch} className="mb-4 flex space-x-2">
-                                <input
-                                    type="text"
-                                    placeholder="Search by Coach Name..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-                                    required
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={isFetching}
-                                    className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 disabled:bg-indigo-400 flex items-center"
-                                >
-                                    {isFetching ? <Loader className="w-5 h-5 mr-2 animate-spin" /> : <Search className="w-5 h-5 mr-2" />}
-                                    Search
-                                </button>
-                            </form>
-
-                            <div className="mt-4 max-h-80 overflow-y-auto border border-gray-200 rounded-lg">
-                                {isFetching && sessionsList.length === 0 && (
-                                    <div className="p-4 text-center text-gray-500 flex items-center justify-center">
-                                        <Loader className="w-4 h-4 mr-2 animate-spin" /> Fetching sessions...
-                                    </div>
-                                )}
-                                {!isFetching && sessionsList.length === 0 && searchTerm && (
-                                    <div className="p-4 text-center text-gray-500">
-                                        No sessions found for "{searchTerm}".
-                                    </div>
-                                )}
-                                {sessionsList.map((session) => (
-                                    <div
-                                        key={session.id}
-                                        onClick={() => onSelectSession(session)}
-                                        className="p-3 border-b border-gray-100 hover:bg-indigo-50 cursor-pointer flex justify-between items-center transition duration-150"
-                                    >
-                                        <div>
-                                            <p className="font-semibold text-gray-800">{session.coachName}</p>
-                                            <p className="text-xs text-gray-500">{session.sessionTopic || 'No topic specified'}</p>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <span className="text-sm text-indigo-600 font-medium">{session.date}</span>
-                                            <FileText className="w-4 h-4 text-indigo-400" />
-                                        </div>
-                                    </div>
-                                ))}
-                                {!isFetching && sessionsList.length > 0 && (
-                                    <div className="text-center p-2 text-sm text-gray-600 bg-gray-50 border-t">
-                                        {sessionsList.length} total sessions found.
-                                    </div>
-                                )}
+        // --- "COMPONENTS" (DOM element factories) ---
+        function Header({ title, onBack, showLogout }) {
+            return `
+                <header class="bg-white shadow-md p-4 flex justify-between items-center w-full sticky top-0 z-20">
+                    <div class="flex items-center">
+                        ${onBack ? `<button onclick="${onBack}" class="p-2 mr-4 text-gray-600 hover:text-gray-900 rounded-full hover:bg-gray-100 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+                        </button>` : ''}
+                        <h1 class="text-2xl font-bold text-gray-800">${title}</h1>
+                    </div>
+                </header>`;
+        }
+        
+        function CoachListScreen() {
+            const el = document.createElement('div');
+            el.className = 'p-4 md:p-8';
+            el.innerHTML = `
+                ${Header({ title: "Rowing Coaches", showLogout: true })}
+                <main class="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    ${Object.entries(state.coaches).map(([id, coach]) => `
+                        <div onclick="handleSelectCoach('${id}')" class="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer flex items-center space-x-4">
+                            <div class="bg-blue-500 rounded-full p-3 text-white"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">${coach.name}</h3>
+                                <p class="text-sm text-gray-500">${coach.sessions.length} session${coach.sessions.length !== 1 ? 's' : ''} recorded</p>
                             </div>
-                            
-                            <div className="mt-5 text-right">
-                                <button
-                                    type="button"
-                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition duration-150"
-                                    onClick={onClose}
-                                >
-                                    Close
-                                </button>
+                        </div>`).join('')}
+                    <button onclick="handleAddNewCoach()" class="bg-gray-100 p-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-500 hover:bg-blue-50 transition-all flex flex-col items-center justify-center text-gray-500 hover:text-blue-600">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        <span class="mt-2 font-semibold">Add New Coach</span>
+                    </button>
+                </main>`;
+            return el;
+        }
+        
+        function CoachDetailScreen() {
+            const el = document.createElement('div');
+            el.className = 'p-4 md:p-8';
+            const coach = state.coaches[state.selectedCoachId];
+
+            el.innerHTML = `
+                ${Header({ title: coach.name, onBack: 'handleBack()' })}
+                <main class="mt-8">
+                    <div id="chart-container" class="bg-white p-6 rounded-lg shadow mb-8"></div>
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">Session History</h2>
+                        <button onclick="handleNewSession()" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                             New Session
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        ${coach.sessions.length > 0 ? coach.sessions.sort((a,b) => new Date(b.date) - new Date(a.date)).map(session => `
+                            <div onclick='handleSelectSession(${JSON.stringify(session)})' class="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer">
+                                <p class="font-semibold text-gray-900">Session: ${new Date(session.date).toLocaleDateString('en-NZ', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                <p class="text-sm text-gray-600 mt-1">Focus: ${session.focus}</p>
+                            </div>`).join('') : `<p class="text-gray-500 md:col-span-2">No sessions recorded yet.</p>`
+                        }
+                    </div>
+                </main>`;
+
+            // Render Chart
+            setTimeout(() => {
+                const chartContainer = document.getElementById('chart-container');
+                if (chartContainer && coach.sessions.length > 0) {
+                     const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = window.Recharts;
+                     const chartData = coach.sessions.map(session => {
+                        const sessionData = { date: new Date(session.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) };
+                        session.feedback.forEach(fb => { sessionData[fb.category] = fb.score; });
+                        return sessionData;
+                     });
+                     const categories = Object.keys(rubricData);
+                     const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE'];
+
+                     const chart = React.createElement(ResponsiveContainer, { width: "100%", height: 400 },
+                         React.createElement(BarChart, { data: chartData, margin: { top: 5, right: 20, left: -10, bottom: 5 } },
+                             React.createElement(CartesianGrid, { strokeDasharray: "3 3" }),
+                             React.createElement(XAxis, { dataKey: "date" }),
+                             React.createElement(YAxis, { domain: [0, 5], allowDecimals: false }),
+                             React.createElement(Tooltip, null),
+                             React.createElement(Legend, null),
+                             ...categories.map((cat, index) => React.createElement(Bar, { key: cat, dataKey: cat, fill: colors[index % colors.length], name: cat.replace("Understands ","")}))
+                         )
+                     );
+                     chartContainer.innerHTML = `<h3 class="text-xl font-semibold text-gray-800 mb-4">Progress Over Time</h3>`;
+                     const chartRoot = document.createElement('div');
+                     chartRoot.style.width = '100%';
+                     chartRoot.style.height = '400px';
+                     chartContainer.appendChild(chartRoot);
+                     ReactDOM.render(chart, chartRoot);
+                } else if(chartContainer) {
+                    chartContainer.style.display = 'none';
+                }
+            }, 0);
+            return el;
+        }
+
+        function SessionFeedbackScreen() {
+             const el = document.createElement('div');
+             el.className = 'p-4 md:p-8';
+             const coach = state.coaches[state.selectedCoachId];
+             let session = state.selectedSession || {
+                id: `session-${Date.now()}`, date: new Date().toISOString().split('T')[0], focus: '',
+                feedback: Object.keys(rubricData).map(cat => ({ category: cat, score: null, comments: '' })),
+                summary: '', actionPlan: ''
+             };
+             
+             el.innerHTML = `
+                ${Header({ title: `${state.selectedSession ? 'Edit' : 'New'} Session for ${coach.name}`, onBack: 'handleBack()' })}
+                <main id="session-form" class="mt-8">
+                    <!-- form content will be injected here -->
+                </main>
+             `;
+
+             // Build and attach form to avoid innerHTML event listener issues
+             setTimeout(() => {
+                const formContainer = document.getElementById('session-form');
+                if(!formContainer) return;
+                
+                const formHTML = `
+                    <div class="bg-white p-6 rounded-lg shadow mb-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="date" class="font-medium text-gray-700 block mb-2">Session Date:</label>
+                                <input type="date" name="date" value="${session.date}" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
+                            </div>
+                            <div>
+                                <label for="focus" class="font-medium text-gray-700 block mb-2">Session Focus:</label>
+                                <input type="text" name="focus" value="${session.focus}" placeholder="e.g., Technical drills, race prep" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
                             </div>
                         </div>
                     </div>
-                </div>
-            );
-        };
+                    ${Object.entries(rubricData).map(([category, data]) => {
+                        const currentFeedback = session.feedback.find(f => f.category === category) || { score: -1, comments: "" };
+                        return `
+                        <div class="bg-white p-6 rounded-lg shadow mb-4">
+                            <h3 class="text-xl font-semibold text-gray-800">${category}</h3>
+                            <p class="text-sm text-gray-500">${data.description}</p>
+                            <div class="mt-6">
+                               <div class="flex justify-between text-xs text-gray-600 px-1 mb-4">
+                                ${[...Array(6)].map((_, i) => `<button data-cat="${category}" data-score="${i}" class="score-btn w-10 h-10 flex items-center justify-center rounded-full transition-colors ${currentFeedback.score === i ? 'bg-blue-600 text-white font-bold' : 'bg-gray-200 hover:bg-blue-100'}">${i}</button>`).join('')}
+                               </div>
+                               <p class="text-gray-700 mb-4 h-12"><strong>Description: </strong><span id="desc-${category.replace(/\s+/g, '')}">${currentFeedback.score > -1 ? data.levels[currentFeedback.score] : "Select a rating."}</span></p>
+                               <textarea name="comments" data-cat="${category}" rows="4" class="w-full p-2 border border-gray-300 rounded-md" placeholder="Add specific examples...">${currentFeedback.comments}</textarea>
+                            </div>
+                        </div>`
+                    }).join('')}
+                     <div class="bg-white p-6 rounded-lg shadow mt-6">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4">Session Summary</h3>
+                        <div>
+                            <label for="summary" class="font-medium text-gray-700 block mb-2">Key Takeaways:</label>
+                            <textarea name="summary" rows="4" class="w-full p-2 border border-gray-300 rounded-md">${session.summary}</textarea>
+                         </div>
+                         <div class="mt-4">
+                            <label for="actionPlan" class="font-medium text-gray-700 block mb-2">Action Plan / Next Steps:</label>
+                            <textarea name="actionPlan" rows="4" class="w-full p-2 border border-gray-300 rounded-md">${session.actionPlan}</textarea>
+                         </div>
+                    </div>
+                    <div class="mt-8 flex justify-end">
+                        <button id="save-btn" class="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700">Save Session Feedback</button>
+                    </div>`;
 
-        // --- Main Application Component ---
-        const App = () => {
-        const [db, setDb] = useState(null);
-        const [auth, setAuth] = useState(null);
-        // userId is set to a temporary string before auth is attempted
-        const [userId, setUserId] = useState('UNINITIALIZED'); 
-        const [isAuthReady, setIsAuthReady] = useState(false);
-        const [feedback, setFeedback] = useState(initialFeedbackState);
-        const [feedbackId, setFeedbackId] = useState(null);
-        const [saveStatus, setSaveStatus] = useState('saved');
-        
-        // Load Session States
-        const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
-        const [searchTerm, setSearchTerm] = useState('');
-        const [sessionsList, setSessionsList] = useState([]);
-        const [isFetching, setIsFetching] = useState(false);
+                formContainer.innerHTML = formHTML;
 
-        // Path is simplified for GH Pages deployment
-        const collectionPath = `coach_feedback_sessions`; 
-
-        // 1. Firebase Initialization and Authentication
-        useEffect(() => {
-            if (Object.keys(firebaseConfig).length === 0 || !firebaseConfig.apiKey) {
-                console.error("Firebase config is missing or incomplete. Data saving is disabled.");
-                setUserId('OFFLINE_INIT_FAILED');
-                setIsAuthReady(true); 
-                return;
-            }
-            try {
-                firebase.firestore.setLogLevel('debug');
-
-                const app = firebase.initializeApp(firebaseConfig);
-                const firestore = app.firestore();
-                const authInstance = app.auth();
-
-                setDb(firestore);
-                setAuth(authInstance);
-
-                const attemptAuth = async () => {
-                    try {
-                        // Attempt anonymous sign-in immediately (required for rules)
-                        const result = await authInstance.signInAnonymously();
-                        // SUCCESS: Set the real user ID (UID)
-                        setUserId(result.user.uid); 
-                        console.log("Authentication successful. User ID set:", result.user.uid);
-                    } catch (error) {
-                        console.error("Firebase Auth Error: Authentication Failed. Check if Anonymous Sign-in is enabled in Firebase Console.", error);
-                        // FAILURE: Set safe fallback ID 
-                        setUserId('OFFLINE_AUTH_FAILED'); 
-                    } finally {
-                        setIsAuthReady(true);
-                    }
-                };
-
-                attemptAuth();
-
-            } catch (error) {
-                console.error("Error initializing Firebase:", error);
-                setUserId('OFFLINE_INIT_FAILED');
-                setIsAuthReady(true);
-            }
-        }, []);
-
-        // Helper to check if user is properly authenticated for DB access
-        const isAuthenticatedForDB = useMemo(() => {
-            return isAuthReady && userId && !userId.startsWith('OFFLINE') && !userId.startsWith('UNINITIALIZED');
-        }, [isAuthReady, userId]);
-
-
-        // 2. Data Persistence (Save)
-        const saveFeedback = useCallback(async (currentFeedback, id) => {
-            // Check 1: Must have a DB connection and an authenticated user
-            if (!db || !isAuthenticatedForDB) {
-                console.warn(`Save skipped: DB not connected, Auth not ready, or User is offline/failed. Status: ${userId}`);
-                setSaveStatus('saved');
-                return;
-            }
-            // Check 2: Must have a coach name to be a valid session
-            if (!currentFeedback.coachName.trim()) {
-                console.warn("Save skipped: Coach Name is required.");
-                setSaveStatus('saved');
-                return;
-            }
-
-            setSaveStatus('saving');
-            const dataToSave = {
-                ...currentFeedback,
-                date: currentFeedback.date, 
-                updatedAt: serverTimestamp(),
-                trainerId: userId, // Use the authenticated UID
-            };
-
-            let docRef;
-            if (id) {
-                docRef = db.collection(collectionPath).doc(id);
-                console.log(`Attempting to UPDATE document: ${id} in ${collectionPath}`);
-            } else {
-                docRef = db.collection(collectionPath).doc();
-                console.log(`Attempting to CREATE new document in ${collectionPath}`);
-            }
-
-            try {
-                if (id) {
-                    await docRef.update(dataToSave);
-                } else {
-                    if (docRef.id) {
-                        await docRef.set({ ...dataToSave, createdAt: serverTimestamp() });
-                        setFeedbackId(docRef.id);
-                    }
-                }
-                setSaveStatus('saved');
-                console.log("Document saved successfully! ID:", docRef.id);
-            } catch (e) {
-                console.error("Error saving document:", e.message, e.code, "Likely a Firestore Security Rule issue.");
-                // If permission denied, show specific error status
-                setSaveStatus(e.code === 'permission-denied' ? 'denied' : 'error');
-            }
-        }, [db, isAuthenticatedForDB, collectionPath, userId]);
-
-        // 3. Auto-Save Effect (Debounced saving)
-        useEffect(() => {
-            // Only save if DB is ready, Auth is successful, and Coach Name is present
-            if (!db || !isAuthenticatedForDB || !feedback.coachName.trim()) return;
-
-            const handler = setTimeout(() => {
-                saveFeedback(feedback, feedbackId);
-            }, 1000);
-
-            return () => {
-                clearTimeout(handler);
-            };
-        }, [feedback, feedbackId, db, isAuthenticatedForDB, saveFeedback]);
-
-
-        // 4. Update Handler
-        const handleUpdate = (categoryKey, field, value) => {
-            setFeedback(prev => {
-            if (categoryKey === 'meta') {
-                return { ...prev, [field]: value };
-            }
-            return {
-                ...prev,
-                [categoryKey]: {
-                ...prev[categoryKey],
-                [field]: value,
-                },
-            };
-            });
-        };
-
-        const handleNewSession = () => {
-            setFeedback({
-                ...initialFeedbackState,
-                date: new Date().toISOString().split('T')[0],
-            });
-            setFeedbackId(null);
-            setSaveStatus('saved');
-        };
-
-        // --- NEW: Load Sessions Logic ---
-
-        // Function to search Firestore for sessions
-        const loadSessions = useCallback(async () => {
-            if (!db || !isAuthenticatedForDB || !searchTerm) return;
-            setIsFetching(true);
-            setSessionsList([]);
-
-            try {
-                // V8 Query: Filter by coachName and order by creation date
-                const querySnapshot = await db.collection(collectionPath)
-                    .where('coachName', '==', searchTerm)
-                    // NOTE: This orderBy requires a composite index in Firestore: coachName (asc), createdAt (desc)
-                    .orderBy('coachName')
-                    .orderBy('createdAt', 'desc')
-                    .get();
-
-                const loadedSessions = [];
-                querySnapshot.forEach(doc => {
-                    const data = doc.data();
-                    loadedSessions.push({
-                        id: doc.id,
-                        ...formatFeedbackData(data),
+                formContainer.querySelectorAll('.score-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const category = btn.dataset.cat;
+                        const score = parseInt(btn.dataset.score);
+                        const fbIndex = session.feedback.findIndex(f => f.category === category);
+                        session.feedback[fbIndex].score = score;
+                        
+                        // Update UI
+                        document.getElementById(`desc-${category.replace(/\s+/g, '')}`).textContent = rubricData[category].levels[score];
+                        formContainer.querySelectorAll(`.score-btn[data-cat="${category}"]`).forEach(b => {
+                            b.classList.toggle('bg-blue-600', parseInt(b.dataset.score) === score);
+                            b.classList.toggle('text-white', parseInt(b.dataset.score) === score);
+                            b.classList.toggle('font-bold', parseInt(b.dataset.score) === score);
+                            b.classList.toggle('bg-gray-200', parseInt(b.dataset.score) !== score);
+                        });
                     });
                 });
-                
-                setSessionsList(loadedSessions);
-            } catch (error) {
-                console.error("Error loading sessions:", error);
-                setSessionsList([]);
-            } finally {
-                setIsFetching(false);
+
+                document.getElementById('save-btn').addEventListener('click', () => {
+                    session.date = formContainer.querySelector('input[name="date"]').value;
+                    session.focus = formContainer.querySelector('input[name="focus"]').value;
+                    session.summary = formContainer.querySelector('textarea[name="summary"]').value;
+                    session.actionPlan = formContainer.querySelector('textarea[name="actionPlan"]').value;
+                    formContainer.querySelectorAll('textarea[name="comments"]').forEach(textarea => {
+                        const category = textarea.dataset.cat;
+                        const fbIndex = session.feedback.findIndex(f => f.category === category);
+                        session.feedback[fbIndex].comments = textarea.value;
+                    });
+                    handleSaveSession(session);
+                });
+
+             }, 0);
+
+             return el;
+        }
+
+        // --- INITIALIZATION ---
+        onAuthStateChanged(auth, (currentUser) => {
+            if (currentUser) {
+                setState({ user: currentUser });
+                const coachesCollection = collection(db, 'coaches');
+                onSnapshot(coachesCollection, (querySnapshot) => {
+                    const coachesData = {};
+                    querySnapshot.forEach((doc) => {
+                        coachesData[doc.id] = { id: doc.id, ...doc.data() };
+                    });
+                    setState({ coaches: coachesData, loading: false });
+                });
+            } else {
+                signInAnonymously(auth).catch(console.error);
             }
-        }, [db, isAuthenticatedForDB, collectionPath, searchTerm]);
+        });
 
-        // Function to load selected session data into the main state
-        const loadSelectedSession = useCallback((session) => {
-            const loadedState = { ...initialFeedbackState, ...session };
-            
-            setFeedback(loadedState);
-            setFeedbackId(session.id);
-            setIsLoadModalOpen(false);
-            setSaveStatus('saved');
-        }, []);
-
-
-        // 5. UI Calculations
-        const rubricRows = useMemo(() => rubricData.map(category => (
-            <RubricRow
-            key={category.key}
-            category={category}
-            feedback={feedback}
-            updateFeedback={handleUpdate}
-            />
-        )), [feedback]);
-
-        const ScoreDisplay = ({ score }) => {
-            const color = {
-            0: 'text-gray-400', 1: 'text-red-500', 2: 'text-yellow-500',
-            3: 'text-green-500', 4: 'text-blue-500', 5: 'text-indigo-600'
-            }[score];
-
-            return <span className={`font-extrabold ${color}`}>{score}</span>;
-        }
-
-        const overallScore = useMemo(() => {
-            const scores = rubricData.map(c => feedback[c.key]?.score || 0);
-            const sum = scores.reduce((a, b) => a + b, 0);
-            const avg = sum / scores.length;
-            return isNaN(avg) ? 0 : avg.toFixed(1);
-        }, [feedback]);
-
-
-        if (!isAuthReady) {
-            return (
-            <div className="flex items-center justify-center h-screen bg-gray-50">
-                <Loader className="animate-spin text-indigo-500 w-8 h-8 mr-3" />
-                <p className="text-lg text-gray-700">Loading Coach Trainer Environment...</p>
-            </div>
-            );
-        }
-        
-        // Render the App 
-        const isSaveDisabled = !feedback.coachName.trim() || !isAuthenticatedForDB;
-        
-        let saveStatusDisplay;
-        if (saveStatus === 'saving') {
-            saveStatusDisplay = <><Loader className="w-4 h-4 mr-2 animate-spin" /> Saving...</>;
-        } else if (saveStatus === 'error') {
-            saveStatusDisplay = <><XCircle className="w-4 h-4 mr-2" /> Save Error</>;
-        } else if (saveStatus === 'denied') {
-            saveStatusDisplay = <><XCircle className="w-4 h-4 mr-2" /> Permission Denied</>;
-        } else if (isSaveDisabled) {
-            saveStatusDisplay = "Data Disabled";
-        } else {
-            saveStatusDisplay = <><Save className="w-4 h-4 mr-2" /> Saved</>;
-        }
-
-        const statusBgColor = saveStatus === 'saving' ? 'bg-yellow-100 text-yellow-800' :
-                              saveStatus === 'error' || saveStatus === 'denied' ? 'bg-red-100 text-red-800' :
-                              isSaveDisabled ? 'bg-gray-100 text-gray-800' :
-                              'bg-indigo-100 text-indigo-800';
-
-        
-        return (
-            <div className="min-h-screen bg-gray-50 font-sans p-4 sm:p-6 lg:p-8">
-            <div className="max-w-4xl mx-auto">
-                {/* Header and Controls */}
-                <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 p-4 bg-white shadow-xl rounded-2xl border-t-4 border-indigo-600">
-                <div>
-                    <h1 className="text-3xl font-extrabold text-gray-900 flex items-center">
-                    <Users className="w-8 h-8 text-indigo-600 mr-3" />
-                    Rowing Coach 1:1 Feedback
-                    </h1>
-                    <p className={`text-sm mt-1 font-medium ${isAuthenticatedForDB ? 'text-green-600' : 'text-red-500'}`}>
-                    Status: {isAuthenticatedForDB ? 'Connected' : 'Offline/Auth Failed'} (ID: {userId || 'N/A'})
-                    </p>
-                </div>
-                <div className="mt-4 md:mt-0 flex space-x-3">
-                    <button
-                        onClick={() => setIsLoadModalOpen(true)}
-                        disabled={!isAuthenticatedForDB}
-                        className="px-4 py-2 bg-indigo-500 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-600 transition duration-150 flex items-center text-sm disabled:bg-gray-400"
-                    >
-                        <Search className="w-4 h-4 mr-2" />
-                        Load Session
-                    </button>
-                    <button
-                    onClick={handleNewSession}
-                    className="px-4 py-2 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 transition duration-150 flex items-center text-sm"
-                    >
-                    New Session
-                    </button>
-                    <div className={`px-4 py-2 rounded-lg font-medium text-sm flex items-center ${statusBgColor}`}
-                    >
-                    {saveStatusDisplay}
-                    </div>
-                </div>
-                </header>
-
-                {/* Session Details Card */}
-                <section className="bg-white p-6 rounded-2xl shadow-xl mb-8 border-l-4 border-indigo-500">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-4">Session Information</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                    <label htmlFor="coachName" className="block text-sm font-medium text-gray-700 mb-1">Coach's Name</label>
-                    <input
-                        type="text"
-                        id="coachName"
-                        value={feedback.coachName}
-                        onChange={(e) => handleUpdate('meta', 'coachName', e.target.value)}
-                        placeholder="Coach's Name (Required to Save)"
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base"
-                    />
-                    </div>
-                    <div>
-                    <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                    <input
-                        type="date"
-                        id="date"
-                        value={feedback.date}
-                        onChange={(e) => handleUpdate('meta', 'date', e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base"
-                    />
-                    </div>
-                    <div className="md:col-span-1">
-                    <label htmlFor="topic" className="block text-sm font-medium text-gray-700 mb-1">Session Topic/Focus</label>
-                    <input
-                        type="text"
-                        id="topic"
-                        value={feedback.sessionTopic}
-                        onChange={(e) => handleUpdate('meta', 'sessionTopic', e.target.value)}
-                        placeholder="e.g., Technical Sculling Drills"
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base"
-                    />
-                    </div>
-                </div>
-                </section>
-
-                {/* Rubric Scoring Section */}
-                <section className="mb-8">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-4">Quality Coaching Rubric Assessment</h2>
-                {rubricRows}
-                </section>
-
-                {/* Summary and Action Plan */}
-                <section className="bg-white p-6 rounded-2xl shadow-xl border-l-4 border-indigo-700">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-4">Summary & Action Plan</h2>
-
-                <div className="mb-6 p-4 bg-indigo-500/10 rounded-lg flex justify-between items-center shadow-inner">
-                    <p className="text-lg font-medium text-gray-700">Overall Average Score:</p>
-                    <p className="text-4xl font-extrabold text-indigo-700">
-                    <ScoreDisplay score={overallScore} />
-                    <span className="text-xl font-normal text-indigo-500"> / 5.0</span>
-                    </p>
-                </div>
-
-                <label htmlFor="actionPlan" className="block text-sm font-medium text-gray-700 mb-1">
-                    Key Takeaways and Next Steps (Action Plan):
-                </label>
-                <textarea
-                    id="actionPlan"
-                    rows="6"
-                    value={feedback.actionPlan}
-                    onChange={(e) => handleUpdate('meta', 'actionPlan', e.target.value)}
-                    placeholder="Summarize the coaching session and detail 2-3 specific, measurable actions for the coach to focus on before the next check-in."
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base resize-none"
-                />
-                </section>
-
-                <footer className="mt-8 text-center text-sm text-gray-500 flex justify-center items-center">
-                <p className="mr-2">Document ID: {feedbackId || 'New Document'}</p>
-                <Clipboard
-                    className="w-4 h-4 cursor-pointer hover:text-indigo-500"
-                    onClick={() => navigator.clipboard.writeText(feedbackId || 'No ID yet').catch(err => console.error('Could not copy text: ', err))}
-                    title="Copy Document ID"
-                />
-                </footer>
-
-                {/* Session Loader Modal */}
-                <SessionLoaderModal 
-                    isOpen={isLoadModalOpen}
-                    onClose={() => setIsLoadModalOpen(false)}
-                    sessionsList={sessionsList}
-                    searchTerm={searchTerm}
-                    setSearchTerm={setSearchTerm}
-                    onLoadSessions={loadSessions}
-                    onSelectSession={loadSelectedSession}
-                    isFetching={isFetching}
-                />
-
-            </div>
-            </div>
-        );
-        };
-
-        // --- Render the App ---
-        const container = document.getElementById('root');
-        if (container) {
-            const root = ReactDOM.createRoot(container);
-            root.render(<App />); 
-        } else {
-            console.error("Root element not found.");
-        }
+        renderApp();
     </script>
 </body>
 </html>
