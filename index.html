@@ -178,41 +178,28 @@
                         Sign In
                     </button>
                     <p id="error-message" class="text-red-500 mt-4 h-5"></p>
-                    <p class="mt-4 text-sm">
-                        <a href="#" id="auth-toggle" class="font-medium text-[#00a99d] hover:text-[#002d3c]">Need an account? Sign Up</a>
-                    </p>
                 </div>
             `;
             
             setTimeout(() => {
-                const title = el.querySelector('#auth-title');
                 const button = el.querySelector('#auth-button');
-                const toggle = el.querySelector('#auth-toggle');
                 const emailInput = el.querySelector('#email');
                 const passwordInput = el.querySelector('#password');
                 const errorMsg = el.querySelector('#error-message');
-                let isLogin = true;
-
-                toggle.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    isLogin = !isLogin;
-                    title.textContent = isLogin ? 'Login' : 'Sign Up';
-                    button.textContent = isLogin ? 'Sign In' : 'Create Account';
-                    toggle.innerHTML = isLogin ? 'Need an account? Sign Up' : 'Already have an account? Sign In';
-                    errorMsg.textContent = '';
-                });
+                const ALLOWED_EMAIL = 'merowing@xtra.co.nz';
 
                 button.addEventListener('click', async () => {
                     const email = emailInput.value;
                     const password = passwordInput.value;
                     errorMsg.textContent = '';
 
+                    if (email.toLowerCase() !== ALLOWED_EMAIL) {
+                        errorMsg.textContent = 'Invalid email address.';
+                        return;
+                    }
+
                     try {
-                        if (isLogin) {
-                            await signInWithEmailAndPassword(auth, email, password);
-                        } else {
-                            await createUserWithEmailAndPassword(auth, email, password);
-                        }
+                        await signInWithEmailAndPassword(auth, email, password);
                     } catch (error) {
                         errorMsg.textContent = error.message.replace('Firebase: ','');
                     }
