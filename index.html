@@ -20,32 +20,33 @@
 <body class="bg-gray-50">
     <div id="app"></div>
 
-    <!-- Add Coach Modal -->
-    <div id="add-coach-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
+    <!-- Add/Edit Coach Modal -->
+    <div id="coach-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
         <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h2 class="text-2xl font-bold mb-4">Add New Coach</h2>
+            <h2 id="modal-title" class="text-2xl font-bold mb-4">Add New Coach</h2>
+            <input type="hidden" id="coach-id-input">
             <div class="space-y-4">
                 <div>
-                    <label for="new-coach-name" class="block text-sm font-medium text-gray-700">Coach Name</label>
-                    <input type="text" id="new-coach-name" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-[#00a99d] focus:border-[#00a99d]">
+                    <label for="coach-name-input" class="block text-sm font-medium text-gray-700">Coach Name</label>
+                    <input type="text" id="coach-name-input" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-[#00a99d] focus:border-[#00a99d]">
                 </div>
                 <div>
-                    <label for="new-coach-club" class="block text-sm font-medium text-gray-700">Club</label>
-                    <select id="new-coach-club" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-[#00a99d] focus:border-[#00a99d]">
+                    <label for="coach-club-select" class="block text-sm font-medium text-gray-700">Club</label>
+                    <select id="coach-club-select" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-[#00a99d] focus:border-[#00a99d]">
                         <!-- Options will be populated by JavaScript -->
                     </select>
                 </div>
             </div>
             <div class="mt-6 flex justify-end space-x-4">
-                <button id="cancel-add-coach" class="bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button id="save-new-coach" class="bg-[#002d3c] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#004e69]">Save Coach</button>
+                <button id="cancel-coach-modal" class="bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button id="save-coach-button" class="bg-[#002d3c] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#004e69]">Save Coach</button>
             </div>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, query, where } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, query, where, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 
         // --- FIREBASE CONFIGURATION ---
@@ -99,7 +100,6 @@
         function renderApp() {
             root.innerHTML = ''; // Clear the screen
             
-            // Guard clause: Don't render anything until auth is ready and user is in state.
             if (!state.user) {
                 root.innerHTML = `<div class="flex justify-center items-center h-screen bg-gray-50"><p class="text-lg text-gray-700">Initializing Authentication...</p></div>`;
                 return;
@@ -112,7 +112,7 @@
 
             if (state.loading) {
                 root.innerHTML = `<div class="flex justify-center items-center h-screen bg-gray-50">
-                    <svg class="animate-spin h-12 w-12 text-[#00a99d]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg class="animate-spin h-12 w-12 text-[#00a99d]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0/0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -141,7 +141,7 @@
             const errorMsg = document.getElementById('error-message');
             if (codeInput.value === ACCESS_CODE) {
                 setState({ isLoggedIn: true, loading: true });
-                loadDataForCurrentUser(); // Use the new, more reliable function
+                loadDataForCurrentUser();
             } else {
                 errorMsg.textContent = 'Incorrect code. Please try again.';
                 codeInput.classList.add('border-red-500');
@@ -155,19 +155,7 @@
             if (state.currentView === 'sessionFeedback') setState({ currentView: 'coachDetail' });
             else if (state.currentView === 'coachDetail') setState({ currentView: 'coachList', selectedCoachId: null });
         };
-        window.handleAddNewCoach = () => {
-            const modal = document.getElementById('add-coach-modal');
-            const select = document.getElementById('new-coach-club');
-            
-            // Populate dropdown if it's empty
-            if (select.innerHTML === '') {
-                select.innerHTML = clubs.map(club => `<option value="${club}">${club}</option>`).join('');
-            }
-            
-            document.getElementById('new-coach-name').value = ''; // Clear previous input
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        };
+       
         window.handleSaveSession = async (sessionData) => {
             const coachRef = doc(db, 'coaches', state.selectedCoachId);
             const coachToUpdate = state.coaches[state.selectedCoachId];
@@ -175,10 +163,19 @@
             let updatedSessions = sessionIndex > -1 
                 ? coachToUpdate.sessions.map(s => s.id === sessionData.id ? sessionData : s)
                 : [...coachToUpdate.sessions, sessionData];
-            const updatedCoach = { ...coachToUpdate, sessions: updatedSessions };
-            delete updatedCoach.id;
-            await setDoc(coachRef, updatedCoach);
+            await updateDoc(coachRef, { sessions: updatedSessions });
             setState({ currentView: 'coachDetail' });
+        };
+        
+        window.handleDeleteCoach = async (coachId, coachName) => {
+             if (confirm(`Are you sure you want to delete ${coachName}? This action cannot be undone.`)) {
+                try {
+                    await deleteDoc(doc(db, 'coaches', coachId));
+                } catch (error) {
+                    console.error("Error deleting coach:", error);
+                    alert("Failed to delete coach. Please try again.");
+                }
+            }
         };
 
         // --- "COMPONENTS" (DOM element factories) ---
@@ -211,7 +208,7 @@
             return el;
         }
 
-        function Header({ title, onBack, showLogout }) {
+        function Header({ title, onBack, rightContent }) {
             return `
                 <header class="bg-white shadow-md p-4 flex justify-between items-center w-full sticky top-0 z-20">
                     <div class="flex items-center">
@@ -220,6 +217,7 @@
                         </button>` : ''}
                         <h1 class="text-2xl font-bold text-gray-800">${title}</h1>
                     </div>
+                    <div>${rightContent || ''}</div>
                 </header>`;
         }
         
@@ -227,18 +225,25 @@
             const el = document.createElement('div');
             el.className = 'p-4 md:p-8';
             el.innerHTML = `
-                ${Header({ title: "Rowing Coaches", showLogout: true })}
+                ${Header({ title: "Rowing Coaches" })}
                 <main class="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     ${Object.entries(state.coaches).map(([id, coach]) => `
-                        <div onclick="handleSelectCoach('${id}')" class="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer flex items-center space-x-4">
-                            <div class="bg-[#00a99d] rounded-full p-3 text-white"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
-                            <div>
-                                <h3 class="text-lg font-semibold text-gray-900">${coach.name}</h3>
-                                <p class="text-sm text-gray-600">${coach.club || 'No club assigned'}</p>
-                                <p class="text-xs text-gray-400 mt-1">${coach.sessions.length} session${coach.sessions.length !== 1 ? 's' : ''} recorded</p>
+                        <div class="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow flex items-center justify-between space-x-4">
+                           <div class="flex items-center space-x-4 cursor-pointer flex-grow" onclick="handleSelectCoach('${id}')">
+                                <div class="bg-[#00a99d] rounded-full p-3 text-white flex-shrink-0">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-900">${coach.name}</h3>
+                                    <p class="text-sm text-gray-600">${coach.club || 'No club assigned'}</p>
+                                    <p class="text-xs text-gray-400 mt-1">${coach.sessions.length} session${coach.sessions.length !== 1 ? 's' : ''} recorded</p>
+                                </div>
                             </div>
+                            <button onclick="handleDeleteCoach('${id}', '${coach.name}')" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors flex-shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                            </button>
                         </div>`).join('')}
-                    <button onclick="handleAddNewCoach()" class="bg-gray-100 p-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-[#00a99d] hover:bg-teal-50 transition-all flex flex-col items-center justify-center text-gray-500 hover:text-[#00a99d]">
+                    <button onclick="openCoachModal()" class="bg-gray-100 p-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-[#00a99d] hover:bg-teal-50 transition-all flex flex-col items-center justify-center text-gray-500 hover:text-[#00a99d]">
                          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                         <span class="mt-2 font-semibold">Add New Coach</span>
                     </button>
@@ -251,8 +256,13 @@
             el.className = 'p-4 md:p-8';
             const coach = state.coaches[state.selectedCoachId];
 
+            const editButton = `<button onclick="openCoachModal('${state.selectedCoachId}')" class="text-sm bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Edit Coach
+            </button>`;
+
             el.innerHTML = `
-                ${Header({ title: coach.name, onBack: 'handleBack()' })}
+                ${Header({ title: coach.name, onBack: 'handleBack()', rightContent: editButton })}
                 <main class="mt-8">
                     <p class="text-lg font-semibold text-[#00a99d] -mt-4 mb-6">${coach.club || 'No Club Assigned'}</p>
                     <div id="chart-container" class="bg-white p-6 rounded-lg shadow mb-8"></div>
@@ -413,7 +423,6 @@
         }
 
         // --- INITIALIZATION ---
-        // This function now runs after a user is guaranteed to be available.
         function loadDataForCurrentUser() {
             if (!state.user || !state.user.uid) {
                 console.error("Critical Error: loadDataForCurrentUser called without a valid user.");
@@ -430,58 +439,93 @@
                 });
                 setState({ coaches: coachesData, loading: false, currentView: 'coachList' });
             }, (error) => {
-                // Added error handling to prevent silent failures and infinite spinners
                 console.error("Firestore Error: ", error);
                 alert("Could not load data. Check console for an error message. It might be a Firestore rules or index issue.");
-                setState({ loading: false, currentView: 'coachList' }); // Stop loading
+                setState({ loading: false, currentView: 'coachList' });
             });
         }
 
         // --- MODAL HANDLING ---
-        function closeAddCoachModal() {
-            const modal = document.getElementById('add-coach-modal');
+        window.openCoachModal = (coachId = null) => {
+            const modal = document.getElementById('coach-modal');
+            const title = document.getElementById('modal-title');
+            const nameInput = document.getElementById('coach-name-input');
+            const clubSelect = document.getElementById('coach-club-select');
+            const coachIdInput = document.getElementById('coach-id-input');
+
+            // Populate club dropdown
+            clubSelect.innerHTML = clubs.map(club => `<option value="${club}">${club}</option>`).join('');
+
+            if (coachId) {
+                // Editing existing coach
+                const coach = state.coaches[coachId];
+                title.textContent = 'Edit Coach';
+                nameInput.value = coach.name;
+                clubSelect.value = coach.club;
+                coachIdInput.value = coachId;
+            } else {
+                // Adding new coach
+                title.textContent = 'Add New Coach';
+                nameInput.value = '';
+                clubSelect.value = clubs[0];
+                coachIdInput.value = '';
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        };
+
+        function closeCoachModal() {
+            const modal = document.getElementById('coach-modal');
             modal.classList.add('hidden');
             modal.classList.remove('flex');
         }
 
-        async function saveNewCoach() {
-            const nameInput = document.getElementById('new-coach-name');
-            const clubSelect = document.getElementById('new-coach-club');
+        async function saveCoach() {
+            const nameInput = document.getElementById('coach-name-input');
+            const clubSelect = document.getElementById('coach-club-select');
+            const coachIdInput = document.getElementById('coach-id-input');
+            
             const name = nameInput.value.trim();
             const club = clubSelect.value;
+            const coachId = coachIdInput.value;
 
             if (!name) {
                 alert("Please enter a coach's name.");
                 return;
             }
 
-            if (name && state.user && state.user.uid) {
-                try {
+            if (!state.user || !state.user.uid) {
+                 alert("Could not save coach because you are not properly signed in. Please refresh the page.");
+                 return;
+            }
+
+            try {
+                if (coachId) {
+                    // Update existing coach
+                    const coachRef = doc(db, 'coaches', coachId);
+                    await updateDoc(coachRef, { name, club });
+                } else {
+                    // Add new coach
                     await addDoc(collection(db, 'coaches'), {
                         name,
                         club,
                         sessions: [],
                         userId: state.user.uid
                     });
-                    closeAddCoachModal();
-                } catch (error) {
-                    console.error("Error adding new coach: ", error);
-                    alert("Failed to add the new coach. Please check the console for errors.");
                 }
-            } else {
-                console.error("Cannot add coach: User is not properly authenticated.", state.user);
-                alert("Could not add coach because you are not properly signed in. Please refresh the page.");
+                closeCoachModal();
+            } catch (error) {
+                console.error("Error saving coach: ", error);
+                alert("Failed to save coach. Please check the console for errors.");
             }
         }
 
         // --- APP STARTUP ---
-        // Set up the authentication listener as soon as the app loads
         onAuthStateChanged(auth, (currentUser) => {
             if (currentUser) {
-                // Set state properly using the setState function, which triggers the first render
                 setState({ user: currentUser });
             } else {
-                // If there's no user, sign in anonymously. This will trigger this listener again.
                 signInAnonymously(auth).catch((error) => {
                     console.error("Anonymous sign-in failed:", error);
                     document.body.innerHTML = `<div class="text-center p-8">
@@ -492,9 +536,9 @@
             }
         });
 
-        // Attach modal event listeners once the DOM is ready
-        document.getElementById('save-new-coach').addEventListener('click', saveNewCoach);
-        document.getElementById('cancel-add-coach').addEventListener('click', closeAddCoachModal);
+        // Attach modal event listeners
+        document.getElementById('save-coach-button').addEventListener('click', saveCoach);
+        document.getElementById('cancel-coach-modal').addEventListener('click', closeCoachModal);
     </script>
 </body>
 </html>
