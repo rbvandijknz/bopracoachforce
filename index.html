@@ -54,151 +54,153 @@
 
         // Rubric data structure based on the provided PDF
         const rubricData = [
-          {
+        {
             key: 'UnderstandsSport',
             title: 'Understands the Sport',
             subtitle: '(Technical, Tactical, Rules)',
             levels: [
-              { score: 0, description: 'Open to Learning' },
-              { score: 1, description: 'Emerging (Starting to notice techniques and rules)' },
-              { score: 2, description: 'Exploring (Beginning to apply knowledge)' },
-              { score: 3, description: 'Applying (Using knowledge with intent)' },
-              { score: 4, description: 'Integrating (Adapting technical/tactical elements confidently)' },
-              { score: 5, description: 'Leading (Mentoring and sharing sport knowledge)' },
+            { score: 0, description: 'Open to Learning' },
+            { score: 1, description: 'Emerging (Starting to notice techniques and rules)' },
+            { score: 2, description: 'Exploring (Beginning to apply knowledge)' },
+            { score: 3, description: 'Applying (Using knowledge with intent)' },
+            { score: 4, description: 'Integrating (Adapting technical/tactical elements confidently)' },
+            { score: 5, description: 'Leading (Mentoring and sharing sport knowledge)' },
             ],
-          },
-          {
+        },
+        {
             key: 'UnderstandsSelf',
             title: 'Understands Self',
             subtitle: '(Leadership, Philosophy, Communication)',
             levels: [
-              { score: 0, description: 'Open to Learning' },
-              { score: 1, description: 'Emerging (Starting to reflect on personal style)' },
-              { score: 2, description: 'Exploring (Becoming aware of coaching role/impact)' },
-              { score: 3, description: 'Applying (Established philosophy and starting to implement)' },
-              { score: 4, description: 'Integrating (Adapting communication and style to suit others)' },
-              { score: 5, description: 'Leading (Supporting others through clear, authentic leadership)' },
+            { score: 0, description: 'Open to Learning' },
+            { score: 1, description: 'Emerging (Starting to reflect on personal style)' },
+            { score: 2, description: 'Exploring (Becoming aware of coaching role/impact)' },
+            { score: 3, description: 'Applying (Established philosophy and starting to implement)' },
+            { score: 4, description: 'Integrating (Adapting communication and style to suit others)' },
+            { score: 5, description: 'Leading (Supporting others through clear, authentic leadership)' },
             ],
-          },
-          {
+        },
+        {
             key: 'UnderstandsEnvironment',
             title: 'Understands Environment',
             subtitle: '(Culture, Learning Space)',
             levels: [
-              { score: 0, description: 'Open to Learning' },
-              { score: 1, description: 'Emerging (Trying new inclusion strategies, noticing dynamics)' },
-              { score: 2, description: 'Exploring (Beginning to consider environment effects)' },
-              { score: 3, description: 'Applying (Creating space that supports trust and growth)' },
-              { score: 4, description: 'Integrating (Shaping a positive culture through deliberate actions)' },
-              { score: 5, description: 'Leading (Supporting athletes in co-creating a positive environment)' },
+            { score: 0, description: 'Open to Learning' },
+            { score: 1, description: 'Emerging (Trying new inclusion strategies, noticing dynamics)' },
+            { score: 2, description: 'Exploring (Beginning to consider environment effects)' },
+            { score: 3, description: 'Applying (Creating space that supports trust and growth)' },
+            { score: 4, description: 'Integrating (Shaping a positive culture through deliberate actions)' },
+            { score: 5, description: 'Leading (Supporting athletes in co-creating a positive environment)' },
             ],
-          },
-          {
+        },
+        {
             key: 'UnderstandsLearning',
             title: 'Understands Learning',
             subtitle: '(Reflection, Planning, Pedagogy)',
             levels: [
-              { score: 0, description: 'Open to Learning' },
-              { score: 1, description: 'Emerging (Starting to think about how people learn)' },
-              { score: 2, description: 'Exploring (Noticing different learning preferences)' },
-              { score: 3, description: 'Applying (Planning sessions with learning styles in mind - Athlete-centred)' },
-              { score: 4, description: 'Integrating (Adapting activities based on reflection and feedback)' },
-              { score: 5, description: 'Leading (Designing learning based on individual needs and goals)' },
+            { score: 0, description: 'Open to Learning' },
+            { score: 1, description: 'Emerging (Starting to think about how people learn)' },
+            { score: 2, description: 'Exploring (Noticing different learning preferences)' },
+            { score: 3, description: 'Applying (Planning sessions with learning styles in mind - Athlete-centred)' },
+            { score: 4, description: 'Integrating (Adapting activities based on reflection and feedback)' },
+            { score: 5, description: 'Leading (Designing learning based on individual needs and goals)' },
             ],
-          },
-          {
+        },
+        {
             key: 'UnderstandsDevelopment',
             title: 'Understands Development',
             subtitle: '(Age & Stage, Feedback)',
             levels: [
-              { score: 0, description: 'Open to Learning' },
-              { score: 1, description: 'Emerging (Reflecting on sessions relative to age and stage)' },
-              { score: 2, description: 'Exploring (Building awareness of how athletes develop)' },
-              { score: 3, description: 'Applying (Providing purposeful feedback and clear expectations)' },
-              { score: 4, description: 'Integrating (Balancing support with challenge in meaningful ways)' },
-              { score: 5, description: 'Leading (Transforming performance through reflective support)' },
+            { score: 0, description: 'Open to Learning' },
+            { score: 1, description: 'Emerging (Reflecting on sessions relative to age and stage)' },
+            { score: 2, description: 'Exploring (Building awareness of how athletes develop)' },
+            { score: 3, description: 'Applying (Providing purposeful feedback and clear expectations)' },
+            { score: 4, description: 'Integrating (Balancing support with challenge in meaningful ways)' },
+            { score: 5, description: 'Leading (Transforming performance through reflective support)' },
             ],
-          },
+        },
         ];
 
         const initialFeedbackState = {
-          coachName: '',
-          date: new Date().toISOString().split('T')[0],
-          sessionTopic: '',
-          ...Object.fromEntries(rubricData.map(item => [item.key, { score: 0, notes: '' }])),
-          actionPlan: '',
-          createdAt: null, // Placeholder for serverTimestamp
+        coachName: '',
+        date: new Date().toISOString().split('T')[0],
+        sessionTopic: '',
+        ...Object.fromEntries(rubricData.map(item => [item.key, { score: 0, notes: '' }])),
+        actionPlan: '',
+        createdAt: null, // Placeholder for serverTimestamp
         };
 
         // --- Custom Components ---
 
         const RubricRow = ({ category, feedback, updateFeedback }) => {
-          const { key, title, subtitle, levels } = category;
-          const { score, notes } = feedback[key];
+        const { key, title, subtitle, levels } = category;
+        const { score, notes } = feedback[key];
 
-          return (
+        return (
             <div className="border border-gray-200 p-4 rounded-xl shadow-md bg-white mb-6">
-              <h3 className="text-xl font-bold text-gray-800">{title}</h3>
-              <p className="text-sm text-indigo-600 mb-3">{subtitle}</p>
+            <h3 className="text-xl font-bold text-gray-800">{title}</h3>
+            <p className="text-sm text-indigo-600 mb-3">{subtitle}</p>
 
-              {/* Score Selection (Radio Group) */}
-              <div className="flex flex-wrap gap-2 mb-4 bg-indigo-50 p-2 rounded-lg">
+            {/* Score Selection (Radio Group) */}
+            <div className="flex flex-wrap gap-2 mb-4 bg-indigo-50 p-2 rounded-lg">
                 {levels.map((level) => (
-                  <button
+                <button
                     key={level.score}
                     onClick={() => updateFeedback(key, 'score', level.score)}
                     className={`flex-1 min-w-[50px] py-2 px-1 text-center font-semibold rounded-lg transition-all duration-200 ease-in-out border-2 ${
-                      score === level.score
+                    score === level.score
                         ? 'bg-indigo-700 text-white border-indigo-900 shadow-lg scale-[1.02]'
                         : 'bg-white text-indigo-700 border-indigo-300 hover:bg-indigo-100'
                     }`}
-                  >
+                >
                     {level.score}
-                  </button>
+                </button>
                 ))}
-              </div>
+            </div>
 
-              {/* Current Level Description */}
-              <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-4">
+            {/* Current Level Description */}
+            <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-4">
                 <p className="font-semibold text-gray-600">Current Level ({score}):</p>
                 <p className="text-sm text-gray-800">
-                  {levels.find(l => l.score === score)?.description || 'No score selected.'}
+                {levels.find(l => l.score === score)?.description || 'No score selected.'}
                 </p>
-              </div>
+            </div>
 
-              {/* Notes/Comments Textarea */}
-              <label htmlFor={`${key}-notes`} className="block text-sm font-medium text-gray-700 mb-1">
+            {/* Notes/Comments Textarea */}
+            <label htmlFor={`${key}-notes`} className="block text-sm font-medium text-gray-700 mb-1">
                 Examples, Reflections, and Comments:
-              </label>
-              <textarea
+            </label>
+            <textarea
                 id={`${key}-notes`}
                 rows="4"
                 value={notes}
                 onChange={(e) => updateFeedback(key, 'notes', e.target.value)}
                 placeholder="Document specific examples and observations from the session..."
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base resize-none"
-              />
+            />
             </div>
-          );
+        );
         };
 
         // --- Main Application Component ---
         const App = () => {
-          const [db, setDb] = useState(null);
-          const [auth, setAuth] = useState(null);
-          const [userId, setUserId] = useState(null);
-          const [isAuthReady, setIsAuthReady] = useState(false);
-          const [feedback, setFeedback] = useState(initialFeedbackState);
-          const [feedbackId, setFeedbackId] = useState(null);
-          const [saveStatus, setSaveStatus] = useState('saved'); // 'saving', 'saved', 'error'
+        const [db, setDb] = useState(null);
+        const [auth, setAuth] = useState(null);
+        const [userId, setUserId] = useState(null);
+        const [isAuthReady, setIsAuthReady] = useState(false);
+        const [feedback, setFeedback] = useState(initialFeedbackState);
+        const [feedbackId, setFeedbackId] = useState(null);
+        const [saveStatus, setSaveStatus] = useState('saved'); // 'saving', 'saved', 'error'
 
-          const collectionPath = `artifacts/${appId}/public/data/rowing_coach_feedback`;
+        const collectionPath = `artifacts/${appId}/public/data/rowing_coach_feedback`;
 
-          // 1. Firebase Initialization and Authentication
-          useEffect(() => {
+        // 1. Firebase Initialization and Authentication
+        useEffect(() => {
             if (Object.keys(firebaseConfig).length === 0) {
                 console.error("Firebase config is missing. Cannot initialize Firestore.");
-                // If config is missing, still allow auth ready to false and show loading until a fix is deployed.
+                // For GitHub pages, this is the expected behavior, but we must set auth ready to continue.
+                setUserId('OFFLINE_USER_' + (Math.random() * 1000).toFixed(0));
+                setIsAuthReady(true); 
                 return;
             }
             try {
@@ -231,259 +233,254 @@
 
                 return () => unsubscribe();
             } catch (error) {
-                // If initialization fails (e.g., config is malformed or script failed to load)
                 console.error("Error initializing Firebase:", error);
+                // Fail fast but allow UI to load
+                setIsAuthReady(true);
             }
-          }, []);
+        }, []);
 
-          // 2. Data Persistence (Save)
-          const saveFeedback = useCallback(async (currentFeedback, id) => {
-            if (!db || !userId || !currentFeedback.coachName) {
-              // Don't save if not ready or coach name is missing
-              setSaveStatus('saved'); // Revert to saved if attempt was made prematurely
-              return;
+        // 2. Data Persistence (Save)
+        const saveFeedback = useCallback(async (currentFeedback, id) => {
+            // Only save if DB is initialized, user is signed in (not just OFFLINE), and a coach name is entered.
+            if (!db || userId.startsWith('OFFLINE') || !currentFeedback.coachName) {
+            setSaveStatus('saved');
+            return;
             }
 
             setSaveStatus('saving');
             const dataToSave = {
-              ...currentFeedback,
-              // V8 server timestamp syntax
-              updatedAt: serverTimestamp(),
-              trainerId: userId,
+            ...currentFeedback,
+            updatedAt: serverTimestamp(),
+            trainerId: userId,
             };
 
             let docRef;
             if (id) {
-                // V8 doc reference syntax
                 docRef = db.collection(collectionPath).doc(id);
             } else {
-                // V8 doc reference syntax for new document
                 docRef = db.collection(collectionPath).doc();
             }
 
             try {
-              if (id) {
-                // V8 update syntax
+            if (id) {
                 await docRef.update(dataToSave);
-              } else {
-                // Create new document only if we have a generated ID
+            } else {
                 if (docRef.id) {
-                    // V8 set syntax
                     await docRef.set({ ...dataToSave, createdAt: serverTimestamp() });
                     setFeedbackId(docRef.id);
                 }
-              }
-              setSaveStatus('saved');
-            } catch (e) {
-              console.error("Error saving document: ", e);
-              setSaveStatus('error');
             }
-          }, [db, userId, collectionPath]);
+            setSaveStatus('saved');
+            } catch (e) {
+            console.error("Error saving document: ", e);
+            setSaveStatus('error');
+            }
+        }, [db, userId, collectionPath]);
 
-          // 3. Auto-Save Effect (Debounced saving)
-          useEffect(() => {
-            // Check if essential firebase services and minimum data are ready
+        // 3. Auto-Save Effect (Debounced saving)
+        useEffect(() => {
             if (!db || !isAuthReady || !feedback.coachName) return;
 
             // Debounce: save 1 second after the last change
             const handler = setTimeout(() => {
-              // Trigger save
-              saveFeedback(feedback, feedbackId);
+            saveFeedback(feedback, feedbackId);
             }, 1000);
 
             return () => {
-              clearTimeout(handler);
+            clearTimeout(handler);
             };
-          }, [feedback, feedbackId, db, isAuthReady, saveFeedback]);
+        }, [feedback, feedbackId, db, isAuthReady, saveFeedback]);
 
 
-          // 4. Update Handler
-          const handleUpdate = (categoryKey, field, value) => {
+        // 4. Update Handler
+        const handleUpdate = (categoryKey, field, value) => {
             setFeedback(prev => {
-              // Handle meta fields (name, topic, plan, etc.)
-              if (categoryKey === 'meta') {
+            if (categoryKey === 'meta') {
                 return { ...prev, [field]: value };
-              }
-              // Handle rubric fields (score, notes)
-              return {
+            }
+            return {
                 ...prev,
                 [categoryKey]: {
-                  ...prev[categoryKey],
-                  [field]: value,
+                ...prev[categoryKey],
+                [field]: value,
                 },
-              };
+            };
             });
-          };
+        };
 
-          const handleNewSession = () => {
-              setFeedback({
-                  ...initialFeedbackState,
-                  date: new Date().toISOString().split('T')[0],
-              });
-              setFeedbackId(null); // Clear ID to trigger creation of new document on next save
-              setSaveStatus('saved');
-          };
+        const handleNewSession = () => {
+            setFeedback({
+                ...initialFeedbackState,
+                date: new Date().toISOString().split('T')[0],
+            });
+            setFeedbackId(null);
+            setSaveStatus('saved');
+        };
 
-          // 5. Rubric Category Component Mapping
-          const rubricRows = useMemo(() => rubricData.map(category => (
+        // 5. Rubric Category Component Mapping
+        const rubricRows = useMemo(() => rubricData.map(category => (
             <RubricRow
-              key={category.key}
-              category={category}
-              feedback={feedback}
-              updateFeedback={handleUpdate}
+            key={category.key}
+            category={category}
+            feedback={feedback}
+            updateFeedback={handleUpdate}
             />
-          )), [feedback]);
+        )), [feedback]);
 
-          const ScoreDisplay = ({ score }) => {
+        const ScoreDisplay = ({ score }) => {
             const color = {
-              0: 'text-gray-400', 1: 'text-red-500', 2: 'text-yellow-500',
-              3: 'text-green-500', 4: 'text-blue-500', 5: 'text-indigo-600'
+            0: 'text-gray-400', 1: 'text-red-500', 2: 'text-yellow-500',
+            3: 'text-green-500', 4: 'text-blue-500', 5: 'text-indigo-600'
             }[score];
 
             return <span className={`font-extrabold ${color}`}>{score}</span>;
-          }
+        }
 
-          const overallScore = useMemo(() => {
+        const overallScore = useMemo(() => {
             const scores = rubricData.map(c => feedback[c.key]?.score || 0);
             const sum = scores.reduce((a, b) => a + b, 0);
             const avg = sum / scores.length;
             return isNaN(avg) ? 0 : avg.toFixed(1);
-          }, [feedback]);
+        }, [feedback]);
 
 
-          if (!isAuthReady) {
+        if (!isAuthReady) {
             return (
-              <div className="flex items-center justify-center h-screen bg-gray-50">
+            <div className="flex items-center justify-center h-screen bg-gray-50">
                 <Loader className="animate-spin text-indigo-500 w-8 h-8 mr-3" />
                 <p className="text-lg text-gray-700">Loading Coach Trainer Environment...</p>
-              </div>
+            </div>
             );
-          }
-
-          return (
+        }
+        
+        // Render the App 
+        return (
             <div className="min-h-screen bg-gray-50 font-sans p-4 sm:p-6 lg:p-8">
-              <div className="max-w-4xl mx-auto">
+            <div className="max-w-4xl mx-auto">
                 {/* Header and Controls */}
                 <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 p-4 bg-white shadow-xl rounded-2xl border-t-4 border-indigo-600">
-                  <div>
+                <div>
                     <h1 className="text-3xl font-extrabold text-gray-900 flex items-center">
-                      <Users className="w-8 h-8 text-indigo-600 mr-3" />
-                      Rowing Coach 1:1 Feedback
+                    <Users className="w-8 h-8 text-indigo-600 mr-3" />
+                    Rowing Coach 1:1 Feedback
                     </h1>
                     <p className="text-sm text-gray-500 mt-1">
-                      Trainer ID: {userId}
+                    Trainer ID: {userId || 'N/A - Offline'}
                     </p>
-                  </div>
-                  <div className="mt-4 md:mt-0 flex space-x-3">
+                </div>
+                <div className="mt-4 md:mt-0 flex space-x-3">
                     <button
-                      onClick={handleNewSession}
-                      className="px-4 py-2 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 transition duration-150 flex items-center text-sm"
+                    onClick={handleNewSession}
+                    className="px-4 py-2 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 transition duration-150 flex items-center text-sm"
                     >
-                      New Session
+                    New Session
                     </button>
                     <div className={`px-4 py-2 rounded-lg font-medium text-sm flex items-center ${
                         saveStatus === 'saving' ? 'bg-yellow-100 text-yellow-800' :
                         saveStatus === 'error' ? 'bg-red-100 text-red-800' :
                         'bg-indigo-100 text-indigo-800'
-                      }`}
+                    }`}
                     >
-                      {saveStatus === 'saving' && <Loader className="w-4 h-4 mr-2 animate-spin" />}
-                      {saveStatus === 'error' && <XCircle className="w-4 h-4 mr-2" />}
-                      {saveStatus === 'saved' && <Save className="w-4 h-4 mr-2" />}
-                      {saveStatus.charAt(0).toUpperCase() + saveStatus.slice(1)}
+                    {saveStatus === 'saving' && <Loader className="w-4 h-4 mr-2 animate-spin" />}
+                    {saveStatus === 'error' && <XCircle className="w-4 h-4 mr-2" />}
+                    {saveStatus === 'saved' && <Save className="w-4 h-4 mr-2" />}
+                    {saveStatus.charAt(0).toUpperCase() + saveStatus.slice(1)}
                     </div>
-                  </div>
+                </div>
                 </header>
 
                 {/* Session Details Card */}
                 <section className="bg-white p-6 rounded-2xl shadow-xl mb-8 border-l-4 border-indigo-500">
-                  <h2 className="text-2xl font-semibold text-gray-800 mb-4">Session Information</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <h2 className="text-2xl font-semibold text-gray-800 mb-4">Session Information</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label htmlFor="coachName" className="block text-sm font-medium text-gray-700 mb-1">Coach's Name</label>
-                      <input
+                    <label htmlFor="coachName" className="block text-sm font-medium text-gray-700 mb-1">Coach's Name</label>
+                    <input
                         type="text"
                         id="coachName"
                         value={feedback.coachName}
                         onChange={(e) => handleUpdate('meta', 'coachName', e.target.value)}
                         placeholder="Coach's Name (Required to Save)"
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base"
-                      />
+                    />
                     </div>
                     <div>
-                      <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                      <input
+                    <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <input
                         type="date"
                         id="date"
                         value={feedback.date}
                         onChange={(e) => handleUpdate('meta', 'date', e.target.value)}
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base"
-                      />
+                    />
                     </div>
                     <div className="md:col-span-1">
-                      <label htmlFor="topic" className="block text-sm font-medium text-gray-700 mb-1">Session Topic/Focus</label>
-                      <input
+                    <label htmlFor="topic" className="block text-sm font-medium text-gray-700 mb-1">Session Topic/Focus</label>
+                    <input
                         type="text"
                         id="topic"
                         value={feedback.sessionTopic}
                         onChange={(e) => handleUpdate('meta', 'sessionTopic', e.target.value)}
                         placeholder="e.g., Technical Sculling Drills"
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base"
-                      />
+                    />
                     </div>
-                  </div>
+                </div>
                 </section>
 
                 {/* Rubric Scoring Section */}
                 <section className="mb-8">
-                  <h2 className="text-2xl font-semibold text-gray-800 mb-4">Quality Coaching Rubric Assessment</h2>
-                  {rubricRows}
+                <h2 className="text-2xl font-semibold text-gray-800 mb-4">Quality Coaching Rubric Assessment</h2>
+                {rubricRows}
                 </section>
 
                 {/* Summary and Action Plan */}
                 <section className="bg-white p-6 rounded-2xl shadow-xl border-l-4 border-indigo-700">
-                  <h2 className="text-2xl font-semibold text-gray-800 mb-4">Summary & Action Plan</h2>
+                <h2 className="text-2xl font-semibold text-gray-800 mb-4">Summary & Action Plan</h2>
 
-                  <div className="mb-6 p-4 bg-indigo-50 rounded-lg flex justify-between items-center shadow-inner">
+                <div className="mb-6 p-4 bg-indigo-50 rounded-lg flex justify-between items-center shadow-inner">
                     <p className="text-lg font-medium text-gray-700">Overall Average Score:</p>
                     <p className="text-4xl font-extrabold text-indigo-700">
-                      <ScoreDisplay score={overallScore} />
-                      <span className="text-xl font-normal text-indigo-500"> / 5.0</span>
+                    <ScoreDisplay score={overallScore} />
+                    <span className="text-xl font-normal text-indigo-500"> / 5.0</span>
                     </p>
-                  </div>
+                </div>
 
-                  <label htmlFor="actionPlan" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="actionPlan" className="block text-sm font-medium text-gray-700 mb-1">
                     Key Takeaways and Next Steps (Action Plan):
-                  </label>
-                  <textarea
+                </label>
+                <textarea
                     id="actionPlan"
                     rows="6"
                     value={feedback.actionPlan}
                     onChange={(e) => handleUpdate('meta', 'actionPlan', e.target.value)}
                     placeholder="Summarize the coaching session and detail 2-3 specific, measurable actions for the coach to focus on before the next check-in."
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base resize-none"
-                  />
+                />
                 </section>
 
                 <footer className="mt-8 text-center text-sm text-gray-500 flex justify-center items-center">
-                  <p className="mr-2">Document ID: {feedbackId || 'New Document'}</p>
-                  <Clipboard
+                <p className="mr-2">Document ID: {feedbackId || 'New Document'}</p>
+                <Clipboard
                     className="w-4 h-4 cursor-pointer hover:text-indigo-500"
                     onClick={() => navigator.clipboard.writeText(feedbackId || 'No ID yet').catch(err => console.error('Could not copy text: ', err))}
                     title="Copy Document ID"
-                  />
+                />
                 </footer>
 
-              </div>
             </div>
-          );
+            </div>
+        );
         };
 
         // --- Render the App ---
         const container = document.getElementById('root');
-        const root = ReactDOM.createRoot(container);
-        root.render(<App />);
-
+        if (container) {
+            const root = ReactDOM.createRoot(container);
+            root.render(<App />); 
+        } else {
+            console.error("Root element not found.");
+        }
     </script>
 </body>
 </html>
