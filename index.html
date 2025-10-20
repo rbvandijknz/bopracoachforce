@@ -47,7 +47,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, query, where, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
-        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 
         // --- FIREBASE CONFIGURATION ---
         const firebaseConfig = {
@@ -59,10 +59,6 @@
             appId: "1:967552327697:web:f3a2e3ffa5d6c6a3f611b0",
             measurementId: "G-NRQ2HSJGT6"
         };
-        
-        // --- ACCESS CODE ---
-        const ACCESS_CODE = "COACH2025"; // Change this to your desired code
-        const SHARED_USER_ID = "bop-rowing-coach-force-shared-data";
 
         // --- RUBRIC DATA ---
         const rubricData = {
@@ -81,11 +77,10 @@
 
         // --- APPLICATION STATE ---
         let state = {
-            isLoggedIn: false,
-            loading: false,
-            user: null,
+            loading: true,
+            user: null, // This will be the firebase user object or null
             coaches: {},
-            currentView: 'login', // login, coachList, coachDetail, sessionFeedback
+            currentView: 'coachList', // Default view if logged in
             selectedCoachId: null,
             selectedSession: null,
         };
@@ -101,24 +96,13 @@
         function renderApp() {
             root.innerHTML = ''; // Clear the screen
             
-            if (!state.user) {
-                root.innerHTML = `<div class="flex justify-center items-center h-screen bg-gray-50"><p class="text-lg text-gray-700">Initializing Authentication...</p></div>`;
-                return;
-            }
-
-            if (!state.isLoggedIn) {
-                root.appendChild(LoginScreen());
-                return;
-            }
-
             if (state.loading) {
-                root.innerHTML = `<div class="flex justify-center items-center h-screen bg-gray-50">
-                    <svg class="animate-spin h-12 w-12 text-[#00a99d]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0/0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <p class="ml-4 text-lg text-gray-700">Loading Coach Data...</p>
-                </div>`;
+                 root.innerHTML = `<div class="flex justify-center items-center h-screen bg-gray-50"><p class="text-lg text-gray-700">Loading Application...</p></div>`;
+                 return;
+            }
+            
+            if (!state.user) {
+                root.appendChild(LoginScreen());
                 return;
             }
 
@@ -137,18 +121,6 @@
         }
         
         // --- DATA HANDLING & NAVIGATION ---
-        window.handleLoginAttempt = () => {
-            const codeInput = document.getElementById('access-code');
-            const errorMsg = document.getElementById('error-message');
-            if (codeInput.value === ACCESS_CODE) {
-                setState({ isLoggedIn: true, loading: true });
-                loadDataForCurrentUser();
-            } else {
-                errorMsg.textContent = 'Incorrect code. Please try again.';
-                codeInput.classList.add('border-red-500');
-            }
-        };
-
         window.handleSelectCoach = (coachId) => setState({ selectedCoachId: coachId, currentView: 'coachDetail' });
         window.handleSelectSession = (session) => setState({ selectedSession: session, currentView: 'sessionFeedback' });
         window.handleNewSession = () => setState({ selectedSession: null, currentView: 'sessionFeedback' });
@@ -179,6 +151,10 @@
             }
         };
 
+        window.handleLogout = async () => {
+            await signOut(auth);
+        };
+
         // --- "COMPONENTS" (DOM element factories) ---
         function LoginScreen() {
             const el = document.createElement('div');
@@ -186,26 +162,64 @@
             el.innerHTML = `
                 <div class="login-card bg-white p-8 rounded-xl shadow-lg text-center">
                     <img src="https://lh3.googleusercontent.com/sitesv/AICyYdYLV_D6MzzdTnPC1n1ljg6hMm-229Rpj6cihcwkvHFQVEu5ZRP8SiEP-YDz9sdPOdqL5kY1Fw7J9YJ13UpAJE4saMpH96fy4DPzVIsLac_FIeuRAWpqPSnlEVIaZPRt6yjlp9PCM6SvgNkoAKGR6hoejuASF2sQiJH22TWGLFQWG-cDKnQafTTd=w16383" alt="Bay of Plenty Rowing Logo" class="w-48 mx-auto mb-6">
-                    <h1 class="text-2xl font-bold text-gray-800 mb-2">Coach Development App</h1>
-                    <p class="text-gray-600 mb-6">Please enter the access code to continue.</p>
-                    <input id="access-code" type="password" placeholder="Access Code" class="w-full p-3 border-2 border-gray-300 rounded-lg text-center text-lg tracking-widest focus:ring-2 focus:ring-[#00a99d] focus:border-[#00a99d] transition mb-4">
-                    <button onclick="handleLoginAttempt()" class="w-full bg-[#002d3c] text-white font-bold py-3 px-6 rounded-lg hover:bg-[#004e69] transition-colors text-lg">
-                        Enter
+                    <h1 id="auth-title" class="text-2xl font-bold text-gray-800 mb-2">Login</h1>
+                    <p class="text-gray-600 mb-6">Enter your credentials to access your coach data.</p>
+                    <div class="space-y-4 text-left">
+                        <div>
+                           <label for="email" class="block text-sm font-medium text-gray-700">Email Address</label>
+                           <input id="email" type="email" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-[#00a99d] focus:border-[#00a99d]">
+                        </div>
+                        <div>
+                           <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                           <input id="password" type="password" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-[#00a99d] focus:border-[#00a99d]">
+                        </div>
+                    </div>
+                    <button id="auth-button" class="mt-6 w-full bg-[#002d3c] text-white font-bold py-3 px-6 rounded-lg hover:bg-[#004e69] transition-colors text-lg">
+                        Sign In
                     </button>
                     <p id="error-message" class="text-red-500 mt-4 h-5"></p>
+                    <p class="mt-4 text-sm">
+                        <a href="#" id="auth-toggle" class="font-medium text-[#00a99d] hover:text-[#002d3c]">Need an account? Sign Up</a>
+                    </p>
                 </div>
             `;
-            // Add event listener for Enter key
+            
             setTimeout(() => {
-                const input = document.getElementById('access-code');
-                if (input) {
-                    input.addEventListener('keyup', (event) => {
-                        if (event.key === 'Enter') {
-                            handleLoginAttempt();
+                const title = el.querySelector('#auth-title');
+                const button = el.querySelector('#auth-button');
+                const toggle = el.querySelector('#auth-toggle');
+                const emailInput = el.querySelector('#email');
+                const passwordInput = el.querySelector('#password');
+                const errorMsg = el.querySelector('#error-message');
+                let isLogin = true;
+
+                toggle.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    isLogin = !isLogin;
+                    title.textContent = isLogin ? 'Login' : 'Sign Up';
+                    button.textContent = isLogin ? 'Sign In' : 'Create Account';
+                    toggle.innerHTML = isLogin ? 'Need an account? Sign Up' : 'Already have an account? Sign In';
+                    errorMsg.textContent = '';
+                });
+
+                button.addEventListener('click', async () => {
+                    const email = emailInput.value;
+                    const password = passwordInput.value;
+                    errorMsg.textContent = '';
+
+                    try {
+                        if (isLogin) {
+                            await signInWithEmailAndPassword(auth, email, password);
+                        } else {
+                            await createUserWithEmailAndPassword(auth, email, password);
                         }
-                    });
-                }
+                    } catch (error) {
+                        errorMsg.textContent = error.message.replace('Firebase: ','');
+                    }
+                });
+
             }, 0);
+
             return el;
         }
 
@@ -225,8 +239,9 @@
         function CoachListScreen() {
             const el = document.createElement('div');
             el.className = 'p-4 md:p-8';
+            const logoutButton = `<button onclick="handleLogout()" class="text-sm bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300">Logout</button>`;
             el.innerHTML = `
-                ${Header({ title: "Rowing Coaches" })}
+                ${Header({ title: "Rowing Coaches", rightContent: logoutButton })}
                 <main class="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     ${Object.entries(state.coaches).map(([id, coach]) => `
                         <div class="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow flex items-center justify-between space-x-4">
@@ -424,25 +439,21 @@
         }
 
         // --- INITIALIZATION ---
-        function loadDataForCurrentUser() {
-            if (!state.user) {
-                console.error("Critical Error: loadDataForCurrentUser called without a valid user session.");
-                alert("Authentication error. Please refresh the page.");
-                setState({ loading: false });
-                return;
-            }
+        let unsubscribe; // To hold the onSnapshot listener
 
-            const coachesQuery = query(collection(db, 'coaches'), where("userId", "==", SHARED_USER_ID));
-            onSnapshot(coachesQuery, (querySnapshot) => {
+        function loadDataForCurrentUser(user) {
+            if (!user || !user.uid) return;
+            
+            const coachesQuery = query(collection(db, 'coaches'), where("userId", "==", user.uid));
+            unsubscribe = onSnapshot(coachesQuery, (querySnapshot) => {
                 const coachesData = {};
                 querySnapshot.forEach((doc) => {
                     coachesData[doc.id] = { id: doc.id, ...doc.data() };
                 });
-                setState({ coaches: coachesData, loading: false, currentView: 'coachList' });
+                setState({ coaches: coachesData });
             }, (error) => {
                 console.error("Firestore Error: ", error);
-                alert("Could not load data. Check console for an error message. It might be a Firestore rules or index issue.");
-                setState({ loading: false, currentView: 'coachList' });
+                alert("Could not load data. Check console for an error message.");
             });
         }
 
@@ -496,7 +507,7 @@
                 return;
             }
 
-            if (!state.user) {
+            if (!state.user || !state.user.uid) {
                  alert("Could not save coach because you are not properly signed in. Please refresh the page.");
                  return;
             }
@@ -512,7 +523,7 @@
                         name,
                         club,
                         sessions: [],
-                        userId: SHARED_USER_ID
+                        userId: state.user.uid
                     });
                 }
                 closeCoachModal();
@@ -525,23 +536,20 @@
         // --- APP STARTUP ---
         onAuthStateChanged(auth, (currentUser) => {
             if (currentUser) {
-                // When the anonymous user is signed in, update the state which will trigger the UI to show the passcode screen.
-                setState({ user: currentUser });
+                // User is signed in.
+                setState({ user: currentUser, loading: false, currentView: 'coachList' });
+                loadDataForCurrentUser(currentUser);
             } else {
-                 // If there's no user, sign in anonymously. This will trigger this listener again.
-                signInAnonymously(auth).catch((error) => {
-                    console.error("Anonymous sign-in failed:", error);
-                    root.innerHTML = `<div class="text-center p-8">
-                        <h1 class="text-2xl font-bold text-red-600">Authentication Failed</h1>
-                        <p class="text-gray-700 mt-2">Could not connect to the authentication service. Please check your network connection and refresh the page.</p>
-                    </div>`;
-                });
+                // User is signed out.
+                if (unsubscribe) unsubscribe(); // Stop listening to old data
+                setState({ user: null, loading: false, coaches: {} });
             }
         });
 
         // Attach modal event listeners
         document.getElementById('save-coach-button').addEventListener('click', saveCoach);
         document.getElementById('cancel-coach-modal').addEventListener('click', closeCoachModal);
+
     </script>
 </body>
 </html>
