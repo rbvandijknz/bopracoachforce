@@ -34,8 +34,6 @@
     <!-- Main React Component and Logic -->
     <script type="text/babel">
         // --- Firebase V8 Access (Simple Global API) ---
-        // We will call methods directly on the globally defined firebase object instances.
-        
         // V8 Access to server timestamp
         const serverTimestamp = () => firebase.firestore.FieldValue.serverTimestamp();
 
@@ -200,6 +198,7 @@
           useEffect(() => {
             if (Object.keys(firebaseConfig).length === 0) {
                 console.error("Firebase config is missing. Cannot initialize Firestore.");
+                // If config is missing, still allow auth ready to false and show loading until a fix is deployed.
                 return;
             }
             try {
