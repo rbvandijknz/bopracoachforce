@@ -50,7 +50,6 @@
         const { useState, useEffect, useCallback, useMemo } = React;
 
         // --- GLOBAL CONFIGURATION (EXTERNAL FIREBASE PROJECT) ---
-        // These keys were provided by the user for deployment to GitHub Pages.
         const GH_PAGES_FIREBASE_CONFIG = {
             apiKey: "AIzaSyAVbGWN3LclrUZMtv-L7x0D8HF7OQ3viK8", 
             authDomain: "bopracoachfeedback.firebaseapp.com",
@@ -60,9 +59,7 @@
             appId: "1:967552327697:web:f3a2e3ffa5d6c6a3f611b0"
         };
         
-        // Use the manual configuration object
         const firebaseConfig = GH_PAGES_FIREBASE_CONFIG;
-        
         const initialAuthToken = null; 
         
         // --- END GLOBAL CONFIGURATION ---
@@ -244,7 +241,8 @@
         const App = () => {
         const [db, setDb] = useState(null);
         const [auth, setAuth] = useState(null);
-        const [userId, setUserId] = useState(null);
+        // userId is set to a temporary string before auth is attempted
+        const [userId, setUserId] = useState('UNINITIALIZED'); 
         const [isAuthReady, setIsAuthReady] = useState(false);
         const [feedback, setFeedback] = useState(initialFeedbackState);
         const [feedbackId, setFeedbackId] = useState(null);
@@ -268,7 +266,6 @@
                 return;
             }
             try {
-                // Set log level to Debug to see detailed auth/firestore activity
                 firebase.firestore.setLogLevel('debug');
 
                 const app = firebase.initializeApp(firebaseConfig);
@@ -282,13 +279,14 @@
                     try {
                         // Attempt anonymous sign-in immediately (required for rules)
                         const result = await authInstance.signInAnonymously();
-                        setUserId(result.user.uid);
+                        // SUCCESS: Set the real user ID (UID)
+                        setUserId(result.user.uid); 
+                        console.log("Authentication successful. User ID set:", result.user.uid);
                     } catch (error) {
-                        console.error("Firebase Auth Error: Authentication Failed. Make sure Anonymous Sign-in is enabled in Firebase Console.", error);
-                        // Set safe fallback ID on failure to prevent the rendering crash
+                        console.error("Firebase Auth Error: Authentication Failed. Check if Anonymous Sign-in is enabled in Firebase Console.", error);
+                        // FAILURE: Set safe fallback ID 
                         setUserId('OFFLINE_AUTH_FAILED'); 
                     } finally {
-                        // Set ready flag regardless of success/failure, now that userId is a guaranteed string
                         setIsAuthReady(true);
                     }
                 };
@@ -302,11 +300,17 @@
             }
         }, []);
 
+        // Helper to check if user is properly authenticated for DB access
+        const isAuthenticatedForDB = useMemo(() => {
+            return isAuthReady && userId && !userId.startsWith('OFFLINE') && !userId.startsWith('UNINITIALIZED');
+        }, [isAuthReady, userId]);
+
+
         // 2. Data Persistence (Save)
         const saveFeedback = useCallback(async (currentFeedback, id) => {
-            // Check 1: Must have a DB connection and an authenticated user (UID will not be null)
-            if (!db || userId.startsWith('OFFLINE')) {
-                console.warn("Save skipped: DB not connected or user is offline.");
+            // Check 1: Must have a DB connection and an authenticated user
+            if (!db || !isAuthenticatedForDB) {
+                console.warn(`Save skipped: DB not connected, Auth not ready, or User is offline/failed. Status: ${userId}`);
                 setSaveStatus('saved');
                 return;
             }
@@ -322,7 +326,7 @@
                 ...currentFeedback,
                 date: currentFeedback.date, 
                 updatedAt: serverTimestamp(),
-                trainerId: userId,
+                trainerId: userId, // Use the authenticated UID
             };
 
             let docRef;
@@ -346,15 +350,16 @@
                 setSaveStatus('saved');
                 console.log("Document saved successfully! ID:", docRef.id);
             } catch (e) {
-                console.error("Error saving document:", e.message, e.code);
-                setSaveStatus('error');
+                console.error("Error saving document:", e.message, e.code, "Likely a Firestore Security Rule issue.");
+                // If permission denied, show specific error status
+                setSaveStatus(e.code === 'permission-denied' ? 'denied' : 'error');
             }
-        }, [db, userId, collectionPath]);
+        }, [db, isAuthenticatedForDB, collectionPath, userId]);
 
         // 3. Auto-Save Effect (Debounced saving)
         useEffect(() => {
-            // Check if userId is a valid authenticated UID (not an 'OFFLINE' fallback string)
-            if (!db || !isAuthReady || !feedback.coachName.trim() || userId.startsWith('OFFLINE')) return;
+            // Only save if DB is ready, Auth is successful, and Coach Name is present
+            if (!db || !isAuthenticatedForDB || !feedback.coachName.trim()) return;
 
             const handler = setTimeout(() => {
                 saveFeedback(feedback, feedbackId);
@@ -363,7 +368,7 @@
             return () => {
                 clearTimeout(handler);
             };
-        }, [feedback, feedbackId, db, isAuthReady, saveFeedback]);
+        }, [feedback, feedbackId, db, isAuthenticatedForDB, saveFeedback]);
 
 
         // 4. Update Handler
@@ -395,7 +400,7 @@
 
         // Function to search Firestore for sessions
         const loadSessions = useCallback(async () => {
-            if (!db || userId.startsWith('OFFLINE') || !searchTerm) return;
+            if (!db || !isAuthenticatedForDB || !searchTerm) return;
             setIsFetching(true);
             setSessionsList([]);
 
@@ -424,7 +429,7 @@
             } finally {
                 setIsFetching(false);
             }
-        }, [db, userId, collectionPath, searchTerm]);
+        }, [db, isAuthenticatedForDB, collectionPath, searchTerm]);
 
         // Function to load selected session data into the main state
         const loadSelectedSession = useCallback((session) => {
@@ -474,7 +479,26 @@
         }
         
         // Render the App 
-        const isSaveDisabled = !feedback.coachName.trim() || userId.startsWith('OFFLINE');
+        const isSaveDisabled = !feedback.coachName.trim() || !isAuthenticatedForDB;
+        
+        let saveStatusDisplay;
+        if (saveStatus === 'saving') {
+            saveStatusDisplay = <><Loader className="w-4 h-4 mr-2 animate-spin" /> Saving...</>;
+        } else if (saveStatus === 'error') {
+            saveStatusDisplay = <><XCircle className="w-4 h-4 mr-2" /> Save Error</>;
+        } else if (saveStatus === 'denied') {
+            saveStatusDisplay = <><XCircle className="w-4 h-4 mr-2" /> Permission Denied</>;
+        } else if (isSaveDisabled) {
+            saveStatusDisplay = "Data Disabled";
+        } else {
+            saveStatusDisplay = <><Save className="w-4 h-4 mr-2" /> Saved</>;
+        }
+
+        const statusBgColor = saveStatus === 'saving' ? 'bg-yellow-100 text-yellow-800' :
+                              saveStatus === 'error' || saveStatus === 'denied' ? 'bg-red-100 text-red-800' :
+                              isSaveDisabled ? 'bg-gray-100 text-gray-800' :
+                              'bg-indigo-100 text-indigo-800';
+
         
         return (
             <div className="min-h-screen bg-gray-50 font-sans p-4 sm:p-6 lg:p-8">
@@ -486,14 +510,14 @@
                     <Users className="w-8 h-8 text-indigo-600 mr-3" />
                     Rowing Coach 1:1 Feedback
                     </h1>
-                    <p className="text-sm text-gray-500 mt-1">
-                    Trainer ID: {userId || 'N/A - Offline'}
+                    <p className={`text-sm mt-1 font-medium ${isAuthenticatedForDB ? 'text-green-600' : 'text-red-500'}`}>
+                    Status: {isAuthenticatedForDB ? 'Connected' : 'Offline/Auth Failed'} (ID: {userId || 'N/A'})
                     </p>
                 </div>
                 <div className="mt-4 md:mt-0 flex space-x-3">
                     <button
                         onClick={() => setIsLoadModalOpen(true)}
-                        disabled={userId.startsWith('OFFLINE')}
+                        disabled={!isAuthenticatedForDB}
                         className="px-4 py-2 bg-indigo-500 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-600 transition duration-150 flex items-center text-sm disabled:bg-gray-400"
                     >
                         <Search className="w-4 h-4 mr-2" />
@@ -505,18 +529,9 @@
                     >
                     New Session
                     </button>
-                    <div className={`px-4 py-2 rounded-lg font-medium text-sm flex items-center ${
-                        saveStatus === 'saving' ? 'bg-yellow-100 text-yellow-800' :
-                        saveStatus === 'error' ? 'bg-red-100 text-red-800' :
-                        isSaveDisabled ? 'bg-gray-100 text-gray-800' :
-                        'bg-indigo-100 text-indigo-800'
-                    }`}
+                    <div className={`px-4 py-2 rounded-lg font-medium text-sm flex items-center ${statusBgColor}`}
                     >
-                    {saveStatus === 'saving' && <Loader className="w-4 h-4 mr-2 animate-spin" />}
-                    {saveStatus === 'error' && <XCircle className="w-4 h-4 mr-2" />}
-                    {saveStatus === 'saved' && <Save className="w-4 h-4 mr-2" />}
-                    {isSaveDisabled && "Data Disabled"}
-                    {!isSaveDisabled && saveStatus.charAt(0).toUpperCase() + saveStatus.slice(1)}
+                    {saveStatusDisplay}
                     </div>
                 </div>
                 </header>
