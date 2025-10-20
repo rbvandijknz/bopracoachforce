@@ -49,10 +49,24 @@
 
         const { useState, useEffect, useCallback, useMemo } = React;
 
-        // --- Global Firebase Configuration and Constants ---
-        const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
-        const firebaseConfig = typeof window.__firebase_config !== 'undefined' ? JSON.parse(window.__firebase_config) : {};
-        const initialAuthToken = typeof window.__initial_auth_token !== 'undefined' ? window.__initial_auth_token : null;
+        // --- GLOBAL CONFIGURATION (EXTERNAL FIREBASE PROJECT) ---
+        // These keys were provided by the user for deployment to GitHub Pages.
+        const GH_PAGES_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyAVbGWN3LclrUZMtv-L7x0D8HF7OQ3viK8", 
+            authDomain: "bopracoachfeedback.firebaseapp.com",
+            projectId: "bopracoachfeedback",
+            storageBucket: "bopracoachfeedback.firebasestorage.app",
+            messagingSenderId: "967552327697",
+            appId: "1:967552327697:web:f3a2e3ffa5d6c6a3f611b0"
+        };
+        
+        // Use the manual configuration object
+        const firebaseConfig = GH_PAGES_FIREBASE_CONFIG;
+        
+        const initialAuthToken = null; 
+        
+        // --- END GLOBAL CONFIGURATION ---
+
         
         // Helper function to format Firestore data (especially timestamps)
         const formatFeedbackData = (data) => {
@@ -242,14 +256,14 @@
         const [sessionsList, setSessionsList] = useState([]);
         const [isFetching, setIsFetching] = useState(false);
 
-        const collectionPath = `artifacts/${appId}/public/data/rowing_coach_feedback`;
+        // Path is simplified for GH Pages deployment
+        const collectionPath = `coach_feedback_sessions`; 
 
         // 1. Firebase Initialization and Authentication
         useEffect(() => {
-            if (Object.keys(firebaseConfig).length === 0) {
-                console.error("Firebase config is missing. Data saving is disabled.");
-                // Use a non-DB user ID for local functionality
-                setUserId('OFFLINE_USER_' + (Math.random() * 1000).toFixed(0));
+            if (Object.keys(firebaseConfig).length === 0 || !firebaseConfig.apiKey) {
+                console.error("Firebase config is missing or incomplete. Data saving is disabled.");
+                setUserId('OFFLINE_INIT_FAILED');
                 setIsAuthReady(true); 
                 return;
             }
@@ -264,33 +278,33 @@
                 setDb(firestore);
                 setAuth(authInstance);
 
-                const unsubscribe = authInstance.onAuthStateChanged(async (user) => {
-                    if (user) {
-                        setUserId(user.uid);
-                    } else {
-                        try {
-                            if (initialAuthToken) {
-                                await authInstance.signInWithCustomToken(initialAuthToken);
-                            } else {
-                                await authInstance.signInAnonymously();
-                            }
-                        } catch (error) {
-                            console.error("Firebase Auth Error:", error);
-                        }
+                const attemptAuth = async () => {
+                    try {
+                        // Attempt anonymous sign-in immediately (required for rules)
+                        const result = await authInstance.signInAnonymously();
+                        setUserId(result.user.uid);
+                    } catch (error) {
+                        console.error("Firebase Auth Error: Authentication Failed. Make sure Anonymous Sign-in is enabled in Firebase Console.", error);
+                        // Set safe fallback ID on failure to prevent the rendering crash
+                        setUserId('OFFLINE_AUTH_FAILED'); 
+                    } finally {
+                        // Set ready flag regardless of success/failure, now that userId is a guaranteed string
+                        setIsAuthReady(true);
                     }
-                    setIsAuthReady(true);
-                });
+                };
 
-                return () => unsubscribe();
+                attemptAuth();
+
             } catch (error) {
                 console.error("Error initializing Firebase:", error);
+                setUserId('OFFLINE_INIT_FAILED');
                 setIsAuthReady(true);
             }
         }, []);
 
         // 2. Data Persistence (Save)
         const saveFeedback = useCallback(async (currentFeedback, id) => {
-            // Check 1: Must have a DB connection and an authenticated user
+            // Check 1: Must have a DB connection and an authenticated user (UID will not be null)
             if (!db || userId.startsWith('OFFLINE')) {
                 console.warn("Save skipped: DB not connected or user is offline.");
                 setSaveStatus('saved');
@@ -306,7 +320,6 @@
             setSaveStatus('saving');
             const dataToSave = {
                 ...currentFeedback,
-                // Ensure date is a string field for query filtering, as Firestore Date/Timestamp objects are complex to query on client side
                 date: currentFeedback.date, 
                 updatedAt: serverTimestamp(),
                 trainerId: userId,
@@ -334,14 +347,14 @@
                 console.log("Document saved successfully! ID:", docRef.id);
             } catch (e) {
                 console.error("Error saving document:", e.message, e.code);
-                // *CRITICAL*: Check console for this error. If it's 'permission-denied', the security rules are the issue.
                 setSaveStatus('error');
             }
         }, [db, userId, collectionPath]);
 
         // 3. Auto-Save Effect (Debounced saving)
         useEffect(() => {
-            if (!db || !isAuthReady || !feedback.coachName.trim()) return;
+            // Check if userId is a valid authenticated UID (not an 'OFFLINE' fallback string)
+            if (!db || !isAuthReady || !feedback.coachName.trim() || userId.startsWith('OFFLINE')) return;
 
             const handler = setTimeout(() => {
                 saveFeedback(feedback, feedbackId);
@@ -388,10 +401,10 @@
 
             try {
                 // V8 Query: Filter by coachName and order by creation date
-                // Note: If this fails, it's often due to missing indexes in Firestore, 
-                // but we must include both 'where' and 'orderBy' for a proper query.
                 const querySnapshot = await db.collection(collectionPath)
                     .where('coachName', '==', searchTerm)
+                    // NOTE: This orderBy requires a composite index in Firestore: coachName (asc), createdAt (desc)
+                    .orderBy('coachName')
                     .orderBy('createdAt', 'desc')
                     .get();
 
