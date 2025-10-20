@@ -373,12 +373,12 @@
         }
 
         // --- INITIALIZATION ---
-        // This function now *only* handles loading data, assuming the user is already authenticated.
+        // This function now runs after a user is guaranteed to be available.
         function loadDataForCurrentUser() {
-            // If auth hasn't finished yet, wait a moment and try again.
-            if (!state.user) {
-                console.warn("User object not ready, retrying data load shortly...");
-                setTimeout(loadDataForCurrentUser, 500);
+            if (!state.user || !state.user.uid) {
+                console.error("Critical Error: loadDataForCurrentUser called without a valid user.");
+                alert("Authentication error. Please refresh the page.");
+                setState({ loading: false });
                 return;
             }
 
@@ -397,18 +397,30 @@
             });
         }
 
+        // --- APP STARTUP ---
+        let authReady = false;
         // Set up the authentication listener as soon as the app loads
         onAuthStateChanged(auth, (currentUser) => {
             if (currentUser) {
                 // Silently keep the user state updated
                 state.user = currentUser;
+                // Only render the app for the first time once authentication is ready.
+                if (!authReady) {
+                    authReady = true;
+                    renderApp(); 
+                }
             } else {
                 // If there's no user, sign in anonymously. This will trigger this listener again.
-                signInAnonymously(auth).catch(console.error);
+                signInAnonymously(auth).catch((error) => {
+                    console.error("Anonymous sign-in failed:", error);
+                    document.body.innerHTML = `<div class="text-center p-8">
+                        <h1 class="text-2xl font-bold text-red-600">Authentication Failed</h1>
+                        <p class="text-gray-700 mt-2">Could not connect to the authentication service. Please check your network connection and refresh the page.</p>
+                    </div>`;
+                });
             }
         });
 
-        renderApp();
     </script>
 </body>
 </html>
