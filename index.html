@@ -75,6 +75,12 @@
         function renderApp() {
             root.innerHTML = ''; // Clear the screen
             
+            // Guard clause: Don't render anything until auth is ready and user is in state.
+            if (!state.user) {
+                root.innerHTML = `<div class="flex justify-center items-center h-screen bg-gray-50"><p class="text-lg text-gray-700">Initializing Authentication...</p></div>`;
+                return;
+            }
+
             if (!state.isLoggedIn) {
                 root.appendChild(LoginScreen());
                 return;
@@ -127,8 +133,21 @@
         };
         window.handleAddNewCoach = async () => {
             const name = prompt("Enter the new coach's name:");
-            if (name && state.user) {
-              await addDoc(collection(db, 'coaches'), { name, sessions: [], userId: state.user.uid });
+            // More robust check to ensure user and uid are available
+            if (name && state.user && state.user.uid) {
+              try {
+                await addDoc(collection(db, 'coaches'), { 
+                  name, 
+                  sessions: [], 
+                  userId: state.user.uid 
+                });
+              } catch (error) {
+                console.error("Error adding new coach: ", error);
+                alert("Failed to add the new coach. Please check the console for errors.");
+              }
+            } else {
+              console.error("Cannot add coach: User is not properly authenticated.", state.user);
+              alert("Could not add coach because you are not properly signed in. Please refresh the page.");
             }
         };
         window.handleSaveSession = async (sessionData) => {
@@ -398,17 +417,11 @@
         }
 
         // --- APP STARTUP ---
-        let authReady = false;
         // Set up the authentication listener as soon as the app loads
         onAuthStateChanged(auth, (currentUser) => {
             if (currentUser) {
-                // Silently keep the user state updated
-                state.user = currentUser;
-                // Only render the app for the first time once authentication is ready.
-                if (!authReady) {
-                    authReady = true;
-                    renderApp(); 
-                }
+                // Set state properly using the setState function, which triggers the first render
+                setState({ user: currentUser });
             } else {
                 // If there's no user, sign in anonymously. This will trigger this listener again.
                 signInAnonymously(auth).catch((error) => {
