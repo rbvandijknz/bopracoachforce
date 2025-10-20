@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coach Feedback App</title>
+    <title>BOP Rowing Coach Development</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/recharts/umd/Recharts.min.js"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Montserrat', sans-serif; }
         .login-card {
             max-width: 400px;
             width: 100%;
@@ -88,7 +88,7 @@
 
             if (state.loading) {
                 root.innerHTML = `<div class="flex justify-center items-center h-screen bg-gray-50">
-                    <svg class="animate-spin h-12 w-12 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg class="animate-spin h-12 w-12 text-[#00a99d]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -169,10 +169,11 @@
             el.className = 'flex flex-col justify-center items-center h-screen bg-gray-100 p-4';
             el.innerHTML = `
                 <div class="login-card bg-white p-8 rounded-xl shadow-lg text-center">
-                    <h1 class="text-2xl font-bold text-gray-800 mb-2">Coach Feedback App</h1>
+                    <img src="https://static.wixstatic.com/media/893575_e6a39b350f554764835a8b7c76a9a4c8~mv2.png/v1/fill/w_448,h_144,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/BOP%20Logo%20Gold%20Oar.png" alt="Bay of Plenty Rowing Logo" class="w-48 mx-auto mb-6">
+                    <h1 class="text-2xl font-bold text-gray-800 mb-2">Coach Development App</h1>
                     <p class="text-gray-600 mb-6">Please enter the access code to continue.</p>
-                    <input id="access-code" type="password" placeholder="Access Code" class="w-full p-3 border-2 border-gray-300 rounded-lg text-center text-lg tracking-widest focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition mb-4">
-                    <button onclick="handleLoginAttempt()" class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors text-lg">
+                    <input id="access-code" type="password" placeholder="Access Code" class="w-full p-3 border-2 border-gray-300 rounded-lg text-center text-lg tracking-widest focus:ring-2 focus:ring-[#00a99d] focus:border-[#00a99d] transition mb-4">
+                    <button onclick="handleLoginAttempt()" class="w-full bg-[#002d3c] text-white font-bold py-3 px-6 rounded-lg hover:bg-[#004e69] transition-colors text-lg">
                         Enter
                     </button>
                     <p id="error-message" class="text-red-500 mt-4 h-5"></p>
@@ -212,13 +213,13 @@
                 <main class="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     ${Object.entries(state.coaches).map(([id, coach]) => `
                         <div onclick="handleSelectCoach('${id}')" class="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer flex items-center space-x-4">
-                            <div class="bg-blue-500 rounded-full p-3 text-white"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+                            <div class="bg-[#00a99d] rounded-full p-3 text-white"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
                             <div>
                                 <h3 class="text-lg font-semibold text-gray-900">${coach.name}</h3>
                                 <p class="text-sm text-gray-500">${coach.sessions.length} session${coach.sessions.length !== 1 ? 's' : ''} recorded</p>
                             </div>
                         </div>`).join('')}
-                    <button onclick="handleAddNewCoach()" class="bg-gray-100 p-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-500 hover:bg-blue-50 transition-all flex flex-col items-center justify-center text-gray-500 hover:text-blue-600">
+                    <button onclick="handleAddNewCoach()" class="bg-gray-100 p-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-[#00a99d] hover:bg-teal-50 transition-all flex flex-col items-center justify-center text-gray-500 hover:text-[#00a99d]">
                          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                         <span class="mt-2 font-semibold">Add New Coach</span>
                     </button>
@@ -237,7 +238,7 @@
                     <div id="chart-container" class="bg-white p-6 rounded-lg shadow mb-8"></div>
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold text-gray-800">Session History</h2>
-                        <button onclick="handleNewSession()" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center">
+                        <button onclick="handleNewSession()" class="bg-[#002d3c] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#004e69] transition-colors flex items-center">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                              New Session
                         </button>
@@ -263,7 +264,7 @@
                         return sessionData;
                      });
                      const categories = Object.keys(rubricData);
-                     const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE'];
+                     const colors = ['#00a99d', '#002d3c', '#ffc658', '#8884d8', '#ff8042'];
 
                      const chart = React.createElement(ResponsiveContainer, { width: "100%", height: 400 },
                          React.createElement(BarChart, { data: chartData, margin: { top: 5, right: 20, left: -10, bottom: 5 } },
@@ -315,11 +316,11 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label for="date" class="font-medium text-gray-700 block mb-2">Session Date:</label>
-                                <input type="date" name="date" value="${session.date}" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
+                                <input type="date" name="date" value="${session.date}" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#00a99d] focus:border-[#00a99d] transition" />
                             </div>
                             <div>
                                 <label for="focus" class="font-medium text-gray-700 block mb-2">Session Focus:</label>
-                                <input type="text" name="focus" value="${session.focus}" placeholder="e.g., Technical drills, race prep" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
+                                <input type="text" name="focus" value="${session.focus}" placeholder="e.g., Technical drills, race prep" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#00a99d] focus:border-[#00a99d] transition" />
                             </div>
                         </div>
                     </div>
@@ -331,7 +332,7 @@
                             <p class="text-sm text-gray-500">${data.description}</p>
                             <div class="mt-6">
                                <div class="flex justify-between text-xs text-gray-600 px-1 mb-4">
-                                ${[...Array(6)].map((_, i) => `<button data-cat="${category}" data-score="${i}" class="score-btn w-10 h-10 flex items-center justify-center rounded-full transition-colors ${currentFeedback.score === i ? 'bg-blue-600 text-white font-bold' : 'bg-gray-200 hover:bg-blue-100'}">${i}</button>`).join('')}
+                                ${[...Array(6)].map((_, i) => `<button data-cat="${category}" data-score="${i}" class="score-btn w-10 h-10 flex items-center justify-center rounded-full transition-colors ${currentFeedback.score === i ? 'bg-[#00a99d] text-white font-bold' : 'bg-gray-200 hover:bg-teal-100'}">${i}</button>`).join('')}
                                </div>
                                <p class="text-gray-700 mb-4 h-12"><strong>Description: </strong><span id="desc-${category.replace(/\s+/g, '')}">${currentFeedback.score > -1 ? data.levels[currentFeedback.score] : "Select a rating."}</span></p>
                                <textarea name="comments" data-cat="${category}" rows="4" class="w-full p-2 border border-gray-300 rounded-md" placeholder="Add specific examples...">${currentFeedback.comments}</textarea>
@@ -350,7 +351,7 @@
                          </div>
                     </div>
                     <div class="mt-8 flex justify-end">
-                        <button id="save-btn" class="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700">Save Session Feedback</button>
+                        <button id="save-btn" class="bg-[#002d3c] text-white font-bold py-3 px-6 rounded-lg hover:bg-[#004e69]">Save Session Feedback</button>
                     </div>`;
 
                 formContainer.innerHTML = formHTML;
@@ -365,7 +366,7 @@
                         // Update UI
                         document.getElementById(`desc-${category.replace(/\s+/g, '')}`).textContent = rubricData[category].levels[score];
                         formContainer.querySelectorAll(`.score-btn[data-cat="${category}"]`).forEach(b => {
-                            b.classList.toggle('bg-blue-600', parseInt(b.dataset.score) === score);
+                            b.classList.toggle('bg-[#00a99d]', parseInt(b.dataset.score) === score);
                             b.classList.toggle('text-white', parseInt(b.dataset.score) === score);
                             b.classList.toggle('font-bold', parseInt(b.dataset.score) === score);
                             b.classList.toggle('bg-gray-200', parseInt(b.dataset.score) !== score);
@@ -437,4 +438,5 @@
     </script>
 </body>
 </html>
+
 
