@@ -20,6 +20,29 @@
 <body class="bg-gray-50">
     <div id="app"></div>
 
+    <!-- Add Coach Modal -->
+    <div id="add-coach-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h2 class="text-2xl font-bold mb-4">Add New Coach</h2>
+            <div class="space-y-4">
+                <div>
+                    <label for="new-coach-name" class="block text-sm font-medium text-gray-700">Coach Name</label>
+                    <input type="text" id="new-coach-name" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-[#00a99d] focus:border-[#00a99d]">
+                </div>
+                <div>
+                    <label for="new-coach-club" class="block text-sm font-medium text-gray-700">Club</label>
+                    <select id="new-coach-club" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-[#00a99d] focus:border-[#00a99d]">
+                        <!-- Options will be populated by JavaScript -->
+                    </select>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end space-x-4">
+                <button id="cancel-add-coach" class="bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button id="save-new-coach" class="bg-[#002d3c] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#004e69]">Save Coach</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, query, where } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
@@ -48,6 +71,7 @@
           "Understands Development": { description: "(age & stage, feedback, development)", levels: ["Building awareness of how athletes develop.", "Reflecting on sessions relative to age and stage.", "Planning sessions with the development needs of age and stage in mind.", "Providing purposeful feedback and clear expectations relative to age and stage.", "Balancing support with challenge in meaningful ways.", "Transforming performance through reflective support."] }
         };
         const levelNames = ["Emerging", "Exploring", "Developing", "Applying", "Integrating", "Leading"];
+        const clubs = ["Bay of Plenty Coast", "Rotorua", "Taupo", "Tauranga", "Whakatane", "Tauranga Boys' College"];
         
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
@@ -131,24 +155,18 @@
             if (state.currentView === 'sessionFeedback') setState({ currentView: 'coachDetail' });
             else if (state.currentView === 'coachDetail') setState({ currentView: 'coachList', selectedCoachId: null });
         };
-        window.handleAddNewCoach = async () => {
-            const name = prompt("Enter the new coach's name:");
-            // More robust check to ensure user and uid are available
-            if (name && state.user && state.user.uid) {
-              try {
-                await addDoc(collection(db, 'coaches'), { 
-                  name, 
-                  sessions: [], 
-                  userId: state.user.uid 
-                });
-              } catch (error) {
-                console.error("Error adding new coach: ", error);
-                alert("Failed to add the new coach. Please check the console for errors.");
-              }
-            } else {
-              console.error("Cannot add coach: User is not properly authenticated.", state.user);
-              alert("Could not add coach because you are not properly signed in. Please refresh the page.");
+        window.handleAddNewCoach = () => {
+            const modal = document.getElementById('add-coach-modal');
+            const select = document.getElementById('new-coach-club');
+            
+            // Populate dropdown if it's empty
+            if (select.innerHTML === '') {
+                select.innerHTML = clubs.map(club => `<option value="${club}">${club}</option>`).join('');
             }
+            
+            document.getElementById('new-coach-name').value = ''; // Clear previous input
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
         };
         window.handleSaveSession = async (sessionData) => {
             const coachRef = doc(db, 'coaches', state.selectedCoachId);
@@ -216,7 +234,8 @@
                             <div class="bg-[#00a99d] rounded-full p-3 text-white"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
                             <div>
                                 <h3 class="text-lg font-semibold text-gray-900">${coach.name}</h3>
-                                <p class="text-sm text-gray-500">${coach.sessions.length} session${coach.sessions.length !== 1 ? 's' : ''} recorded</p>
+                                <p class="text-sm text-gray-600">${coach.club || 'No club assigned'}</p>
+                                <p class="text-xs text-gray-400 mt-1">${coach.sessions.length} session${coach.sessions.length !== 1 ? 's' : ''} recorded</p>
                             </div>
                         </div>`).join('')}
                     <button onclick="handleAddNewCoach()" class="bg-gray-100 p-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-[#00a99d] hover:bg-teal-50 transition-all flex flex-col items-center justify-center text-gray-500 hover:text-[#00a99d]">
@@ -235,6 +254,7 @@
             el.innerHTML = `
                 ${Header({ title: coach.name, onBack: 'handleBack()' })}
                 <main class="mt-8">
+                    <p class="text-lg font-semibold text-[#00a99d] -mt-4 mb-6">${coach.club || 'No Club Assigned'}</p>
                     <div id="chart-container" class="bg-white p-6 rounded-lg shadow mb-8"></div>
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold text-gray-800">Session History</h2>
@@ -417,6 +437,43 @@
             });
         }
 
+        // --- MODAL HANDLING ---
+        function closeAddCoachModal() {
+            const modal = document.getElementById('add-coach-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function saveNewCoach() {
+            const nameInput = document.getElementById('new-coach-name');
+            const clubSelect = document.getElementById('new-coach-club');
+            const name = nameInput.value.trim();
+            const club = clubSelect.value;
+
+            if (!name) {
+                alert("Please enter a coach's name.");
+                return;
+            }
+
+            if (name && state.user && state.user.uid) {
+                try {
+                    await addDoc(collection(db, 'coaches'), {
+                        name,
+                        club,
+                        sessions: [],
+                        userId: state.user.uid
+                    });
+                    closeAddCoachModal();
+                } catch (error) {
+                    console.error("Error adding new coach: ", error);
+                    alert("Failed to add the new coach. Please check the console for errors.");
+                }
+            } else {
+                console.error("Cannot add coach: User is not properly authenticated.", state.user);
+                alert("Could not add coach because you are not properly signed in. Please refresh the page.");
+            }
+        }
+
         // --- APP STARTUP ---
         // Set up the authentication listener as soon as the app loads
         onAuthStateChanged(auth, (currentUser) => {
@@ -435,9 +492,10 @@
             }
         });
 
+        // Attach modal event listeners once the DOM is ready
+        document.getElementById('save-new-coach').addEventListener('click', saveNewCoach);
+        document.getElementById('cancel-add-coach').addEventListener('click', closeAddCoachModal);
     </script>
 </body>
 </html>
-
-
 
