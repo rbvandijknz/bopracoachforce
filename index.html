@@ -39,86 +39,43 @@
 
         // --- Lucide Icons Mock ---
         const Clipboard = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="4" width="6" height="4" rx="1" /><path d="M10 20h4M12 20v-8M18 10h-2M6 10H4M16 10H8M21 10V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8zM12 14v4" /></svg>;
-        const Save = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /><path d="M12 17v-4h-4" /></svg>; // Adjusted save icon
+        const Save = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /><path d="M12 17v-4h-4" /></svg>;
         const Loader = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>;
         const XCircle = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" /></svg>;
         const Users = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>;
+        const Search = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>;
+        const FileText = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>;
+
 
         const { useState, useEffect, useCallback, useMemo } = React;
 
         // --- Global Firebase Configuration and Constants ---
-        // NOTE: These are defined using window access since they are environment variables injected globally.
         const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
         const firebaseConfig = typeof window.__firebase_config !== 'undefined' ? JSON.parse(window.__firebase_config) : {};
         const initialAuthToken = typeof window.__initial_auth_token !== 'undefined' ? window.__initial_auth_token : null;
+        
+        // Helper function to format Firestore data (especially timestamps)
+        const formatFeedbackData = (data) => {
+            const formattedData = { ...data };
+            if (formattedData.createdAt && formattedData.createdAt.toDate) {
+                formattedData.date = formattedData.createdAt.toDate().toISOString().split('T')[0];
+            }
+            // Ensure scores are numbers
+            for (const key in formattedData) {
+                if (rubricData.some(r => r.key === key) && formattedData[key].score !== undefined) {
+                    formattedData[key].score = Number(formattedData[key].score);
+                }
+            }
+            return formattedData;
+        };
 
-        // Rubric data structure based on the provided PDF
+        // Rubric data structure remains the same
         const rubricData = [
-        {
-            key: 'UnderstandsSport',
-            title: 'Understands the Sport',
-            subtitle: '(Technical, Tactical, Rules)',
-            levels: [
-            { score: 0, description: 'Open to Learning' },
-            { score: 1, description: 'Emerging (Starting to notice techniques and rules)' },
-            { score: 2, description: 'Exploring (Beginning to apply knowledge)' },
-            { score: 3, description: 'Applying (Using knowledge with intent)' },
-            { score: 4, description: 'Integrating (Adapting technical/tactical elements confidently)' },
-            { score: 5, description: 'Leading (Mentoring and sharing sport knowledge)' },
-            ],
-        },
-        {
-            key: 'UnderstandsSelf',
-            title: 'Understands Self',
-            subtitle: '(Leadership, Philosophy, Communication)',
-            levels: [
-            { score: 0, description: 'Open to Learning' },
-            { score: 1, description: 'Emerging (Starting to reflect on personal style)' },
-            { score: 2, description: 'Exploring (Becoming aware of coaching role/impact)' },
-            { score: 3, description: 'Applying (Established philosophy and starting to implement)' },
-            { score: 4, description: 'Integrating (Adapting communication and style to suit others)' },
-            { score: 5, description: 'Leading (Supporting others through clear, authentic leadership)' },
-            ],
-        },
-        {
-            key: 'UnderstandsEnvironment',
-            title: 'Understands Environment',
-            subtitle: '(Culture, Learning Space)',
-            levels: [
-            { score: 0, description: 'Open to Learning' },
-            { score: 1, description: 'Emerging (Trying new inclusion strategies, noticing dynamics)' },
-            { score: 2, description: 'Exploring (Beginning to consider environment effects)' },
-            { score: 3, description: 'Applying (Creating space that supports trust and growth)' },
-            { score: 4, description: 'Integrating (Shaping a positive culture through deliberate actions)' },
-            { score: 5, description: 'Leading (Supporting athletes in co-creating a positive environment)' },
-            ],
-        },
-        {
-            key: 'UnderstandsLearning',
-            title: 'Understands Learning',
-            subtitle: '(Reflection, Planning, Pedagogy)',
-            levels: [
-            { score: 0, description: 'Open to Learning' },
-            { score: 1, description: 'Emerging (Starting to think about how people learn)' },
-            { score: 2, description: 'Exploring (Noticing different learning preferences)' },
-            { score: 3, description: 'Applying (Planning sessions with learning styles in mind - Athlete-centred)' },
-            { score: 4, description: 'Integrating (Adapting activities based on reflection and feedback)' },
-            { score: 5, description: 'Leading (Designing learning based on individual needs and goals)' },
-            ],
-        },
-        {
-            key: 'UnderstandsDevelopment',
-            title: 'Understands Development',
-            subtitle: '(Age & Stage, Feedback)',
-            levels: [
-            { score: 0, description: 'Open to Learning' },
-            { score: 1, description: 'Emerging (Reflecting on sessions relative to age and stage)' },
-            { score: 2, description: 'Exploring (Building awareness of how athletes develop)' },
-            { score: 3, description: 'Applying (Providing purposeful feedback and clear expectations)' },
-            { score: 4, description: 'Integrating (Balancing support with challenge in meaningful ways)' },
-            { score: 5, description: 'Leading (Transforming performance through reflective support)' },
-            ],
-        },
+        { key: 'UnderstandsSport', title: 'Understands the Sport', subtitle: '(Technical, Tactical, Rules)', levels: [ { score: 0, description: 'Open to Learning' }, { score: 1, description: 'Emerging (Starting to notice techniques and rules)' }, { score: 2, description: 'Exploring (Beginning to apply knowledge)' }, { score: 3, description: 'Applying (Using knowledge with intent)' }, { score: 4, description: 'Integrating (Adapting technical/tactical elements confidently)' }, { score: 5, description: 'Leading (Mentoring and sharing sport knowledge)' }, ]},
+        { key: 'UnderstandsSelf', title: 'Understands Self', subtitle: '(Leadership, Philosophy, Communication)', levels: [ { score: 0, description: 'Open to Learning' }, { score: 1, description: 'Emerging (Starting to reflect on personal style)' }, { score: 2, description: 'Exploring (Becoming aware of coaching role/impact)' }, { score: 3, description: 'Applying (Established philosophy and starting to implement)' }, { score: 4, description: 'Integrating (Adapting communication and style to suit others)' }, { score: 5, description: 'Leading (Supporting others through clear, authentic leadership)' }, ]},
+        { key: 'UnderstandsEnvironment', title: 'Understands Environment', subtitle: '(Culture, Learning Space)', levels: [ { score: 0, description: 'Open to Learning' }, { score: 1, description: 'Emerging (Trying new inclusion strategies, noticing dynamics)' }, { score: 2, description: 'Exploring (Beginning to consider environment effects)' }, { score: 3, description: 'Applying (Creating space that supports trust and growth)' }, { score: 4, description: 'Integrating (Shaping a positive culture through deliberate actions)' }, { score: 5, description: 'Leading (Supporting athletes in co-creating a positive environment)' }, ]},
+        { key: 'UnderstandsLearning', title: 'Understands Learning', subtitle: '(Reflection, Planning, Pedagogy)', levels: [ { score: 0, description: 'Open to Learning' }, { score: 1, description: 'Emerging (Starting to think about how people learn)' }, { score: 2, description: 'Exploring (Noticing different learning preferences)' }, { score: 3, description: 'Applying (Planning sessions with learning styles in mind - Athlete-centred)' }, { score: 4, description: 'Integrating (Adapting activities based on reflection and feedback)' }, { score: 5, description: 'Leading (Designing learning based on individual needs and goals)' }, ]},
+        { key: 'UnderstandsDevelopment', title: 'Understands Development', subtitle: '(Age & Stage, Feedback)', levels: [ { score: 0, description: 'Open to Learning' }, { score: 1, description: 'Emerging (Reflecting on sessions relative to age and stage)' }, { score: 2, description: 'Exploring (Building awareness of how athletes develop)' }, { score: 3, description: 'Applying (Providing purposeful feedback and clear expectations)' }, { score: 4, description: 'Integrating (Balancing support with challenge in meaningful ways)' }, { score: 5, description: 'Leading (Transforming performance through reflective support)' }, ]},
         ];
 
         const initialFeedbackState = {
@@ -127,14 +84,14 @@
         sessionTopic: '',
         ...Object.fromEntries(rubricData.map(item => [item.key, { score: 0, notes: '' }])),
         actionPlan: '',
-        createdAt: null, // Placeholder for serverTimestamp
+        createdAt: null,
         };
 
         // --- Custom Components ---
 
         const RubricRow = ({ category, feedback, updateFeedback }) => {
         const { key, title, subtitle, levels } = category;
-        const { score, notes } = feedback[key];
+        const { score, notes } = feedback[key] || {score: 0, notes: ''}; // Ensure fallback for newly loaded data
 
         return (
             <div className="border border-gray-200 p-4 rounded-xl shadow-md bg-white mb-6">
@@ -142,7 +99,7 @@
             <p className="text-sm text-indigo-600 mb-3">{subtitle}</p>
 
             {/* Score Selection (Radio Group) */}
-            <div className="flex flex-wrap gap-2 mb-4 bg-indigo-50 p-2 rounded-lg">
+            <div className="flex flex-wrap gap-2 mb-4 bg-indigo-500/10 p-2 rounded-lg">
                 {levels.map((level) => (
                 <button
                     key={level.score}
@@ -182,6 +139,93 @@
         );
         };
 
+        // --- Load Sessions Modal Component ---
+        const SessionLoaderModal = ({ isOpen, onClose, sessionsList, searchTerm, setSearchTerm, onLoadSessions, onSelectSession, isFetching }) => {
+            
+            const handleSearch = (e) => {
+                e.preventDefault();
+                onLoadSessions();
+            };
+            
+            return (
+                <div className={`fixed inset-0 z-50 overflow-y-auto ${isOpen ? 'block' : 'hidden'}`}>
+                    <div className="flex items-center justify-center min-h-screen p-4 text-center">
+                        <div className="fixed inset-0 transition-opacity bg-gray-900 bg-opacity-75" onClick={onClose}></div>
+                        
+                        <div className="inline-block w-full max-w-lg p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-xl">
+                            <h3 className="text-2xl font-bold leading-6 text-gray-900 flex items-center mb-4">
+                                <Search className="w-6 h-6 mr-2 text-indigo-600" />
+                                Load Existing Session
+                            </h3>
+                            
+                            <form onSubmit={handleSearch} className="mb-4 flex space-x-2">
+                                <input
+                                    type="text"
+                                    placeholder="Search by Coach Name..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                                    required
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={isFetching}
+                                    className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 disabled:bg-indigo-400 flex items-center"
+                                >
+                                    {isFetching ? <Loader className="w-5 h-5 mr-2 animate-spin" /> : <Search className="w-5 h-5 mr-2" />}
+                                    Search
+                                </button>
+                            </form>
+
+                            <div className="mt-4 max-h-80 overflow-y-auto border border-gray-200 rounded-lg">
+                                {isFetching && sessionsList.length === 0 && (
+                                    <div className="p-4 text-center text-gray-500 flex items-center justify-center">
+                                        <Loader className="w-4 h-4 mr-2 animate-spin" /> Fetching sessions...
+                                    </div>
+                                )}
+                                {!isFetching && sessionsList.length === 0 && searchTerm && (
+                                    <div className="p-4 text-center text-gray-500">
+                                        No sessions found for "{searchTerm}".
+                                    </div>
+                                )}
+                                {sessionsList.map((session) => (
+                                    <div
+                                        key={session.id}
+                                        onClick={() => onSelectSession(session)}
+                                        className="p-3 border-b border-gray-100 hover:bg-indigo-50 cursor-pointer flex justify-between items-center transition duration-150"
+                                    >
+                                        <div>
+                                            <p className="font-semibold text-gray-800">{session.coachName}</p>
+                                            <p className="text-xs text-gray-500">{session.sessionTopic || 'No topic specified'}</p>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-sm text-indigo-600 font-medium">{session.date}</span>
+                                            <FileText className="w-4 h-4 text-indigo-400" />
+                                        </div>
+                                    </div>
+                                ))}
+                                {!isFetching && sessionsList.length > 0 && (
+                                    <div className="text-center p-2 text-sm text-gray-600 bg-gray-50 border-t">
+                                        {sessionsList.length} total sessions found.
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="mt-5 text-right">
+                                <button
+                                    type="button"
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition duration-150"
+                                    onClick={onClose}
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         // --- Main Application Component ---
         const App = () => {
         const [db, setDb] = useState(null);
@@ -190,7 +234,13 @@
         const [isAuthReady, setIsAuthReady] = useState(false);
         const [feedback, setFeedback] = useState(initialFeedbackState);
         const [feedbackId, setFeedbackId] = useState(null);
-        const [saveStatus, setSaveStatus] = useState('saved'); // 'saving', 'saved', 'error'
+        const [saveStatus, setSaveStatus] = useState('saved');
+        
+        // Load Session States
+        const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
+        const [searchTerm, setSearchTerm] = useState('');
+        const [sessionsList, setSessionsList] = useState([]);
+        const [isFetching, setIsFetching] = useState(false);
 
         const collectionPath = `artifacts/${appId}/public/data/rowing_coach_feedback`;
 
@@ -198,13 +248,11 @@
         useEffect(() => {
             if (Object.keys(firebaseConfig).length === 0) {
                 console.error("Firebase config is missing. Cannot initialize Firestore.");
-                // For GitHub pages, this is the expected behavior, but we must set auth ready to continue.
                 setUserId('OFFLINE_USER_' + (Math.random() * 1000).toFixed(0));
                 setIsAuthReady(true); 
                 return;
             }
             try {
-                // V8 Initialization
                 const app = firebase.initializeApp(firebaseConfig);
                 const firestore = app.firestore();
                 const authInstance = app.auth();
@@ -212,12 +260,10 @@
                 setDb(firestore);
                 setAuth(authInstance);
 
-                // V8 onAuthStateChanged
                 const unsubscribe = authInstance.onAuthStateChanged(async (user) => {
                     if (user) {
                         setUserId(user.uid);
                     } else {
-                        // Sign in anonymously or with custom token
                         try {
                             if (initialAuthToken) {
                                 await authInstance.signInWithCustomToken(initialAuthToken);
@@ -234,14 +280,12 @@
                 return () => unsubscribe();
             } catch (error) {
                 console.error("Error initializing Firebase:", error);
-                // Fail fast but allow UI to load
                 setIsAuthReady(true);
             }
         }, []);
 
-        // 2. Data Persistence (Save)
+        // 2. Data Persistence (Save) - Logic remains the same
         const saveFeedback = useCallback(async (currentFeedback, id) => {
-            // Only save if DB is initialized, user is signed in (not just OFFLINE), and a coach name is entered.
             if (!db || userId.startsWith('OFFLINE') || !currentFeedback.coachName) {
             setSaveStatus('saved');
             return;
@@ -277,11 +321,10 @@
             }
         }, [db, userId, collectionPath]);
 
-        // 3. Auto-Save Effect (Debounced saving)
+        // 3. Auto-Save Effect (Debounced saving) - Logic remains the same
         useEffect(() => {
             if (!db || !isAuthReady || !feedback.coachName) return;
 
-            // Debounce: save 1 second after the last change
             const handler = setTimeout(() => {
             saveFeedback(feedback, feedbackId);
             }, 1000);
@@ -292,7 +335,7 @@
         }, [feedback, feedbackId, db, isAuthReady, saveFeedback]);
 
 
-        // 4. Update Handler
+        // 4. Update Handler - Logic remains the same
         const handleUpdate = (categoryKey, field, value) => {
             setFeedback(prev => {
             if (categoryKey === 'meta') {
@@ -317,7 +360,53 @@
             setSaveStatus('saved');
         };
 
-        // 5. Rubric Category Component Mapping
+        // --- NEW: Load Sessions Logic ---
+
+        // Function to search Firestore for sessions
+        const loadSessions = useCallback(async () => {
+            if (!db || userId.startsWith('OFFLINE') || !searchTerm) return;
+            setIsFetching(true);
+            setSessionsList([]);
+
+            try {
+                // V8 Query: Filter by coachName and order by creation date
+                const querySnapshot = await db.collection(collectionPath)
+                    .where('coachName', '==', searchTerm)
+                    .orderBy('createdAt', 'desc')
+                    .get();
+
+                const loadedSessions = [];
+                querySnapshot.forEach(doc => {
+                    const data = doc.data();
+                    loadedSessions.push({
+                        id: doc.id,
+                        ...formatFeedbackData(data),
+                    });
+                });
+                
+                setSessionsList(loadedSessions);
+            } catch (error) {
+                console.error("Error loading sessions:", error);
+                setSessionsList([]);
+            } finally {
+                setIsFetching(false);
+            }
+        }, [db, userId, collectionPath, searchTerm]);
+
+        // Function to load selected session data into the main state
+        const loadSelectedSession = useCallback((session) => {
+            // Reconstruct the state structure, ensuring all rubric keys are present
+            const loadedState = { ...initialFeedbackState, ...session };
+            
+            // Set the state and close the modal
+            setFeedback(loadedState);
+            setFeedbackId(session.id);
+            setIsLoadModalOpen(false);
+            setSaveStatus('saved');
+        }, []);
+
+
+        // 5. Rubric Category Component Mapping - Logic remains the same
         const rubricRows = useMemo(() => rubricData.map(category => (
             <RubricRow
             key={category.key}
@@ -369,6 +458,13 @@
                     </p>
                 </div>
                 <div className="mt-4 md:mt-0 flex space-x-3">
+                    <button
+                        onClick={() => setIsLoadModalOpen(true)}
+                        className="px-4 py-2 bg-indigo-500 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-600 transition duration-150 flex items-center text-sm"
+                    >
+                        <Search className="w-4 h-4 mr-2" />
+                        Load Session
+                    </button>
                     <button
                     onClick={handleNewSession}
                     className="px-4 py-2 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 transition duration-150 flex items-center text-sm"
@@ -438,7 +534,7 @@
                 <section className="bg-white p-6 rounded-2xl shadow-xl border-l-4 border-indigo-700">
                 <h2 className="text-2xl font-semibold text-gray-800 mb-4">Summary & Action Plan</h2>
 
-                <div className="mb-6 p-4 bg-indigo-50 rounded-lg flex justify-between items-center shadow-inner">
+                <div className="mb-6 p-4 bg-indigo-500/10 rounded-lg flex justify-between items-center shadow-inner">
                     <p className="text-lg font-medium text-gray-700">Overall Average Score:</p>
                     <p className="text-4xl font-extrabold text-indigo-700">
                     <ScoreDisplay score={overallScore} />
@@ -467,6 +563,18 @@
                     title="Copy Document ID"
                 />
                 </footer>
+
+                {/* Session Loader Modal */}
+                <SessionLoaderModal 
+                    isOpen={isLoadModalOpen}
+                    onClose={() => setIsLoadModalOpen(false)}
+                    sessionsList={sessionsList}
+                    searchTerm={searchTerm}
+                    setSearchTerm={setSearchTerm}
+                    onLoadSessions={loadSessions}
+                    onSelectSession={loadSelectedSession}
+                    isFetching={isFetching}
+                />
 
             </div>
             </div>
