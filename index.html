@@ -111,7 +111,7 @@
             const errorMsg = document.getElementById('error-message');
             if (codeInput.value === ACCESS_CODE) {
                 setState({ isLoggedIn: true, loading: true });
-                initializeFirebaseAndLoadData();
+                loadDataForCurrentUser(); // Use the new, more reliable function
             } else {
                 errorMsg.textContent = 'Incorrect code. Please try again.';
                 codeInput.classList.add('border-red-500');
@@ -373,23 +373,40 @@
         }
 
         // --- INITIALIZATION ---
-        function initializeFirebaseAndLoadData() {
-            onAuthStateChanged(auth, (currentUser) => {
-                if (currentUser) {
-                    setState({ user: currentUser });
-                    const coachesQuery = query(collection(db, 'coaches'), where("userId", "==", currentUser.uid));
-                    onSnapshot(coachesQuery, (querySnapshot) => {
-                        const coachesData = {};
-                        querySnapshot.forEach((doc) => {
-                            coachesData[doc.id] = { id: doc.id, ...doc.data() };
-                        });
-                        setState({ coaches: coachesData, loading: false, currentView: 'coachList' });
-                    });
-                } else {
-                    signInAnonymously(auth).catch(console.error);
-                }
+        // This function now *only* handles loading data, assuming the user is already authenticated.
+        function loadDataForCurrentUser() {
+            // If auth hasn't finished yet, wait a moment and try again.
+            if (!state.user) {
+                console.warn("User object not ready, retrying data load shortly...");
+                setTimeout(loadDataForCurrentUser, 500);
+                return;
+            }
+
+            const coachesQuery = query(collection(db, 'coaches'), where("userId", "==", state.user.uid));
+            onSnapshot(coachesQuery, (querySnapshot) => {
+                const coachesData = {};
+                querySnapshot.forEach((doc) => {
+                    coachesData[doc.id] = { id: doc.id, ...doc.data() };
+                });
+                setState({ coaches: coachesData, loading: false, currentView: 'coachList' });
+            }, (error) => {
+                // Added error handling to prevent silent failures and infinite spinners
+                console.error("Firestore Error: ", error);
+                alert("Could not load data. Check console for an error message. It might be a Firestore rules or index issue.");
+                setState({ loading: false, currentView: 'coachList' }); // Stop loading
             });
         }
+
+        // Set up the authentication listener as soon as the app loads
+        onAuthStateChanged(auth, (currentUser) => {
+            if (currentUser) {
+                // Silently keep the user state updated
+                state.user = currentUser;
+            } else {
+                // If there's no user, sign in anonymously. This will trigger this listener again.
+                signInAnonymously(auth).catch(console.error);
+            }
+        });
 
         renderApp();
     </script>
