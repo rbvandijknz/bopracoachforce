@@ -91,7 +91,7 @@
 
         const RubricRow = ({ category, feedback, updateFeedback }) => {
         const { key, title, subtitle, levels } = category;
-        const { score, notes } = feedback[key] || {score: 0, notes: ''}; // Ensure fallback for newly loaded data
+        const { score, notes } = feedback[key] || {score: 0, notes: ''};
 
         return (
             <div className="border border-gray-200 p-4 rounded-xl shadow-md bg-white mb-6">
@@ -247,12 +247,16 @@
         // 1. Firebase Initialization and Authentication
         useEffect(() => {
             if (Object.keys(firebaseConfig).length === 0) {
-                console.error("Firebase config is missing. Cannot initialize Firestore.");
+                console.error("Firebase config is missing. Data saving is disabled.");
+                // Use a non-DB user ID for local functionality
                 setUserId('OFFLINE_USER_' + (Math.random() * 1000).toFixed(0));
                 setIsAuthReady(true); 
                 return;
             }
             try {
+                // Set log level to Debug to see detailed auth/firestore activity
+                firebase.firestore.setLogLevel('debug');
+
                 const app = firebase.initializeApp(firebaseConfig);
                 const firestore = app.firestore();
                 const authInstance = app.auth();
@@ -284,58 +288,72 @@
             }
         }, []);
 
-        // 2. Data Persistence (Save) - Logic remains the same
+        // 2. Data Persistence (Save)
         const saveFeedback = useCallback(async (currentFeedback, id) => {
-            if (!db || userId.startsWith('OFFLINE') || !currentFeedback.coachName) {
-            setSaveStatus('saved');
-            return;
+            // Check 1: Must have a DB connection and an authenticated user
+            if (!db || userId.startsWith('OFFLINE')) {
+                console.warn("Save skipped: DB not connected or user is offline.");
+                setSaveStatus('saved');
+                return;
+            }
+            // Check 2: Must have a coach name to be a valid session
+            if (!currentFeedback.coachName.trim()) {
+                console.warn("Save skipped: Coach Name is required.");
+                setSaveStatus('saved');
+                return;
             }
 
             setSaveStatus('saving');
             const dataToSave = {
-            ...currentFeedback,
-            updatedAt: serverTimestamp(),
-            trainerId: userId,
+                ...currentFeedback,
+                // Ensure date is a string field for query filtering, as Firestore Date/Timestamp objects are complex to query on client side
+                date: currentFeedback.date, 
+                updatedAt: serverTimestamp(),
+                trainerId: userId,
             };
 
             let docRef;
             if (id) {
                 docRef = db.collection(collectionPath).doc(id);
+                console.log(`Attempting to UPDATE document: ${id} in ${collectionPath}`);
             } else {
                 docRef = db.collection(collectionPath).doc();
+                console.log(`Attempting to CREATE new document in ${collectionPath}`);
             }
 
             try {
-            if (id) {
-                await docRef.update(dataToSave);
-            } else {
-                if (docRef.id) {
-                    await docRef.set({ ...dataToSave, createdAt: serverTimestamp() });
-                    setFeedbackId(docRef.id);
+                if (id) {
+                    await docRef.update(dataToSave);
+                } else {
+                    if (docRef.id) {
+                        await docRef.set({ ...dataToSave, createdAt: serverTimestamp() });
+                        setFeedbackId(docRef.id);
+                    }
                 }
-            }
-            setSaveStatus('saved');
+                setSaveStatus('saved');
+                console.log("Document saved successfully! ID:", docRef.id);
             } catch (e) {
-            console.error("Error saving document: ", e);
-            setSaveStatus('error');
+                console.error("Error saving document:", e.message, e.code);
+                // *CRITICAL*: Check console for this error. If it's 'permission-denied', the security rules are the issue.
+                setSaveStatus('error');
             }
         }, [db, userId, collectionPath]);
 
-        // 3. Auto-Save Effect (Debounced saving) - Logic remains the same
+        // 3. Auto-Save Effect (Debounced saving)
         useEffect(() => {
-            if (!db || !isAuthReady || !feedback.coachName) return;
+            if (!db || !isAuthReady || !feedback.coachName.trim()) return;
 
             const handler = setTimeout(() => {
-            saveFeedback(feedback, feedbackId);
+                saveFeedback(feedback, feedbackId);
             }, 1000);
 
             return () => {
-            clearTimeout(handler);
+                clearTimeout(handler);
             };
         }, [feedback, feedbackId, db, isAuthReady, saveFeedback]);
 
 
-        // 4. Update Handler - Logic remains the same
+        // 4. Update Handler
         const handleUpdate = (categoryKey, field, value) => {
             setFeedback(prev => {
             if (categoryKey === 'meta') {
@@ -370,6 +388,8 @@
 
             try {
                 // V8 Query: Filter by coachName and order by creation date
+                // Note: If this fails, it's often due to missing indexes in Firestore, 
+                // but we must include both 'where' and 'orderBy' for a proper query.
                 const querySnapshot = await db.collection(collectionPath)
                     .where('coachName', '==', searchTerm)
                     .orderBy('createdAt', 'desc')
@@ -395,10 +415,8 @@
 
         // Function to load selected session data into the main state
         const loadSelectedSession = useCallback((session) => {
-            // Reconstruct the state structure, ensuring all rubric keys are present
             const loadedState = { ...initialFeedbackState, ...session };
             
-            // Set the state and close the modal
             setFeedback(loadedState);
             setFeedbackId(session.id);
             setIsLoadModalOpen(false);
@@ -406,7 +424,7 @@
         }, []);
 
 
-        // 5. Rubric Category Component Mapping - Logic remains the same
+        // 5. UI Calculations
         const rubricRows = useMemo(() => rubricData.map(category => (
             <RubricRow
             key={category.key}
@@ -443,6 +461,8 @@
         }
         
         // Render the App 
+        const isSaveDisabled = !feedback.coachName.trim() || userId.startsWith('OFFLINE');
+        
         return (
             <div className="min-h-screen bg-gray-50 font-sans p-4 sm:p-6 lg:p-8">
             <div className="max-w-4xl mx-auto">
@@ -460,7 +480,8 @@
                 <div className="mt-4 md:mt-0 flex space-x-3">
                     <button
                         onClick={() => setIsLoadModalOpen(true)}
-                        className="px-4 py-2 bg-indigo-500 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-600 transition duration-150 flex items-center text-sm"
+                        disabled={userId.startsWith('OFFLINE')}
+                        className="px-4 py-2 bg-indigo-500 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-600 transition duration-150 flex items-center text-sm disabled:bg-gray-400"
                     >
                         <Search className="w-4 h-4 mr-2" />
                         Load Session
@@ -474,13 +495,15 @@
                     <div className={`px-4 py-2 rounded-lg font-medium text-sm flex items-center ${
                         saveStatus === 'saving' ? 'bg-yellow-100 text-yellow-800' :
                         saveStatus === 'error' ? 'bg-red-100 text-red-800' :
+                        isSaveDisabled ? 'bg-gray-100 text-gray-800' :
                         'bg-indigo-100 text-indigo-800'
                     }`}
                     >
                     {saveStatus === 'saving' && <Loader className="w-4 h-4 mr-2 animate-spin" />}
                     {saveStatus === 'error' && <XCircle className="w-4 h-4 mr-2" />}
                     {saveStatus === 'saved' && <Save className="w-4 h-4 mr-2" />}
-                    {saveStatus.charAt(0).toUpperCase() + saveStatus.slice(1)}
+                    {isSaveDisabled && "Data Disabled"}
+                    {!isSaveDisabled && saveStatus.charAt(0).toUpperCase() + saveStatus.slice(1)}
                     </div>
                 </div>
                 </header>
