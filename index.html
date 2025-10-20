@@ -62,6 +62,7 @@
         
         // --- ACCESS CODE ---
         const ACCESS_CODE = "COACH2025"; // Change this to your desired code
+        const SHARED_USER_ID = "bop-rowing-coach-force-shared-data";
 
         // --- RUBRIC DATA ---
         const rubricData = {
@@ -424,14 +425,14 @@
 
         // --- INITIALIZATION ---
         function loadDataForCurrentUser() {
-            if (!state.user || !state.user.uid) {
-                console.error("Critical Error: loadDataForCurrentUser called without a valid user.");
+            if (!state.user) {
+                console.error("Critical Error: loadDataForCurrentUser called without a valid user session.");
                 alert("Authentication error. Please refresh the page.");
                 setState({ loading: false });
                 return;
             }
 
-            const coachesQuery = query(collection(db, 'coaches'), where("userId", "==", state.user.uid));
+            const coachesQuery = query(collection(db, 'coaches'), where("userId", "==", SHARED_USER_ID));
             onSnapshot(coachesQuery, (querySnapshot) => {
                 const coachesData = {};
                 querySnapshot.forEach((doc) => {
@@ -495,7 +496,7 @@
                 return;
             }
 
-            if (!state.user || !state.user.uid) {
+            if (!state.user) {
                  alert("Could not save coach because you are not properly signed in. Please refresh the page.");
                  return;
             }
@@ -511,7 +512,7 @@
                         name,
                         club,
                         sessions: [],
-                        userId: state.user.uid
+                        userId: SHARED_USER_ID
                     });
                 }
                 closeCoachModal();
@@ -524,11 +525,13 @@
         // --- APP STARTUP ---
         onAuthStateChanged(auth, (currentUser) => {
             if (currentUser) {
+                // When the anonymous user is signed in, update the state which will trigger the UI to show the passcode screen.
                 setState({ user: currentUser });
             } else {
+                 // If there's no user, sign in anonymously. This will trigger this listener again.
                 signInAnonymously(auth).catch((error) => {
                     console.error("Anonymous sign-in failed:", error);
-                    document.body.innerHTML = `<div class="text-center p-8">
+                    root.innerHTML = `<div class="text-center p-8">
                         <h1 class="text-2xl font-bold text-red-600">Authentication Failed</h1>
                         <p class="text-gray-700 mt-2">Could not connect to the authentication service. Please check your network connection and refresh the page.</p>
                     </div>`;
