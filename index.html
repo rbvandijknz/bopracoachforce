@@ -22,7 +22,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, query, where } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 
         // --- FIREBASE CONFIGURATION ---
@@ -377,8 +377,8 @@
             onAuthStateChanged(auth, (currentUser) => {
                 if (currentUser) {
                     setState({ user: currentUser });
-                    const coachesCollection = collection(db, 'coaches');
-                    onSnapshot(coachesCollection, (querySnapshot) => {
+                    const coachesQuery = query(collection(db, 'coaches'), where("userId", "==", currentUser.uid));
+                    onSnapshot(coachesQuery, (querySnapshot) => {
                         const coachesData = {};
                         querySnapshot.forEach((doc) => {
                             coachesData[doc.id] = { id: doc.id, ...doc.data() };
