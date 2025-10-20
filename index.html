@@ -11,6 +11,10 @@
     <script src="https://unpkg.com/recharts/umd/Recharts.min.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
+        .login-card {
+            max-width: 400px;
+            width: 100%;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -31,6 +35,9 @@
             appId: "1:967552327697:web:f3a2e3ffa5d6c6a3f611b0",
             measurementId: "G-NRQ2HSJGT6"
         };
+        
+        // --- ACCESS CODE ---
+        const ACCESS_CODE = "COACH2025"; // Change this to your desired code
 
         // --- RUBRIC DATA ---
         const rubricData = {
@@ -48,10 +55,11 @@
 
         // --- APPLICATION STATE ---
         let state = {
-            loading: true,
+            isLoggedIn: false,
+            loading: false,
             user: null,
             coaches: {},
-            currentView: 'coachList', // coachList, coachDetail, sessionFeedback
+            currentView: 'login', // login, coachList, coachDetail, sessionFeedback
             selectedCoachId: null,
             selectedSession: null,
         };
@@ -66,6 +74,11 @@
 
         function renderApp() {
             root.innerHTML = ''; // Clear the screen
+            
+            if (!state.isLoggedIn) {
+                root.appendChild(LoginScreen());
+                return;
+            }
 
             if (state.loading) {
                 root.innerHTML = `<div class="flex justify-center items-center h-screen bg-gray-50">
@@ -93,6 +106,18 @@
         }
         
         // --- DATA HANDLING & NAVIGATION ---
+        window.handleLoginAttempt = () => {
+            const codeInput = document.getElementById('access-code');
+            const errorMsg = document.getElementById('error-message');
+            if (codeInput.value === ACCESS_CODE) {
+                setState({ isLoggedIn: true, loading: true });
+                initializeFirebaseAndLoadData();
+            } else {
+                errorMsg.textContent = 'Incorrect code. Please try again.';
+                codeInput.classList.add('border-red-500');
+            }
+        };
+
         window.handleSelectCoach = (coachId) => setState({ selectedCoachId: coachId, currentView: 'coachDetail' });
         window.handleSelectSession = (session) => setState({ selectedSession: session, currentView: 'sessionFeedback' });
         window.handleNewSession = () => setState({ selectedSession: null, currentView: 'sessionFeedback' });
@@ -120,6 +145,34 @@
         };
 
         // --- "COMPONENTS" (DOM element factories) ---
+        function LoginScreen() {
+            const el = document.createElement('div');
+            el.className = 'flex flex-col justify-center items-center h-screen bg-gray-100 p-4';
+            el.innerHTML = `
+                <div class="login-card bg-white p-8 rounded-xl shadow-lg text-center">
+                    <h1 class="text-2xl font-bold text-gray-800 mb-2">Coach Feedback App</h1>
+                    <p class="text-gray-600 mb-6">Please enter the access code to continue.</p>
+                    <input id="access-code" type="password" placeholder="Access Code" class="w-full p-3 border-2 border-gray-300 rounded-lg text-center text-lg tracking-widest focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition mb-4">
+                    <button onclick="handleLoginAttempt()" class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors text-lg">
+                        Enter
+                    </button>
+                    <p id="error-message" class="text-red-500 mt-4 h-5"></p>
+                </div>
+            `;
+            // Add event listener for Enter key
+            setTimeout(() => {
+                const input = document.getElementById('access-code');
+                if (input) {
+                    input.addEventListener('keyup', (event) => {
+                        if (event.key === 'Enter') {
+                            handleLoginAttempt();
+                        }
+                    });
+                }
+            }, 0);
+            return el;
+        }
+
         function Header({ title, onBack, showLogout }) {
             return `
                 <header class="bg-white shadow-md p-4 flex justify-between items-center w-full sticky top-0 z-20">
@@ -320,23 +373,26 @@
         }
 
         // --- INITIALIZATION ---
-        onAuthStateChanged(auth, (currentUser) => {
-            if (currentUser) {
-                setState({ user: currentUser });
-                const coachesCollection = collection(db, 'coaches');
-                onSnapshot(coachesCollection, (querySnapshot) => {
-                    const coachesData = {};
-                    querySnapshot.forEach((doc) => {
-                        coachesData[doc.id] = { id: doc.id, ...doc.data() };
+        function initializeFirebaseAndLoadData() {
+            onAuthStateChanged(auth, (currentUser) => {
+                if (currentUser) {
+                    setState({ user: currentUser });
+                    const coachesCollection = collection(db, 'coaches');
+                    onSnapshot(coachesCollection, (querySnapshot) => {
+                        const coachesData = {};
+                        querySnapshot.forEach((doc) => {
+                            coachesData[doc.id] = { id: doc.id, ...doc.data() };
+                        });
+                        setState({ coaches: coachesData, loading: false, currentView: 'coachList' });
                     });
-                    setState({ coaches: coachesData, loading: false });
-                });
-            } else {
-                signInAnonymously(auth).catch(console.error);
-            }
-        });
+                } else {
+                    signInAnonymously(auth).catch(console.error);
+                }
+            });
+        }
 
         renderApp();
     </script>
 </body>
 </html>
+
