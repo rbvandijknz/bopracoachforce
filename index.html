@@ -86,6 +86,7 @@
             currentView: 'coachList', // Default view if logged in
             selectedCoachId: null,
             selectedSession: null,
+            searchQuery: '',
         };
         
         const root = document.getElementById('app');
@@ -203,6 +204,10 @@
             // Go back to the session feedback screen
             setState({ currentView: 'sessionFeedback', selectedSession: currentSession });
         };
+        
+        window.handleSearch = (query) => {
+            setState({ searchQuery: query });
+        };
 
 
         // --- "COMPONENTS" (DOM element factories) ---
@@ -281,10 +286,19 @@
                 <button onclick="handleRestoreClick()" class="text-sm bg-green-100 text-green-800 font-bold py-2 px-4 rounded-lg hover:bg-green-200">Restore Data</button>
                 <button onclick="handleLogout()" class="text-sm bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300">Logout</button>
             `;
+
+            const filteredCoaches = Object.entries(state.coaches).filter(([id, coach]) => {
+                const query = state.searchQuery.toLowerCase();
+                return coach.name.toLowerCase().includes(query) || (coach.club && coach.club.toLowerCase().includes(query));
+            });
+
             el.innerHTML = `
                 ${Header({ title: "Rowing Coaches", rightContent: rightHeaderContent })}
-                <main class="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    ${Object.entries(state.coaches).map(([id, coach]) => `
+                <div class="mt-6 mb-4">
+                    <input type="search" oninput="handleSearch(this.value)" value="${state.searchQuery}" placeholder="Search by name or club..." class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-[#00a99d] focus:border-[#00a99d]">
+                </div>
+                <main class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    ${filteredCoaches.map(([id, coach]) => `
                         <div class="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow flex items-center justify-between space-x-4">
                            <div class="flex items-center space-x-4 cursor-pointer flex-grow" onclick="handleSelectCoach('${id}')">
                                 <div class="bg-[#00a99d] rounded-full p-3 text-white flex-shrink-0">
