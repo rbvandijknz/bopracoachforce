@@ -12,6 +12,14 @@
             max-width: 400px;
             width: 100%;
         }
+         /* Style for average score display */
+        .avg-score {
+            font-size: 0.9rem;
+            font-weight: 500;
+            padding: 0.1rem 0.5rem;
+            border-radius: 0.5rem;
+            margin-left: 0.5rem;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -162,7 +170,6 @@
             loading: false, 
             loadingMessage: "Initializing Application...", 
             user: null, // Only admin user will populate this
-            // isAdmin removed, coachProfileNotFound removed
             coaches: {}, 
             currentView: 'coachList', 
             selectedCoachId: null, 
@@ -172,6 +179,27 @@
         
         const root = document.getElementById('app');
         let currentUserId = null; 
+
+        // --- HELPER FUNCTIONS ---
+        function calculateAverageScore(feedbackArray) {
+            if (!feedbackArray || feedbackArray.length === 0) return '--';
+            
+            let sum = 0;
+            let count = 0;
+            feedbackArray.forEach(item => {
+                // Ensure score is a number between 0 and 5
+                if (typeof item.score === 'number' && item.score >= 0 && item.score <= 5) {
+                    sum += item.score;
+                    count++;
+                }
+            });
+
+            if (count === 0) return '--';
+            
+            const average = sum / count;
+            return average.toFixed(1); // Round to one decimal place
+        }
+
 
         // --- STATE MANAGEMENT & RENDERING ---
         function setState(newState) {
@@ -240,10 +268,10 @@
         };
        
         window.handleSaveSession = async (sessionData) => {
-            if (!state.selectedCoachId) return; // Simplified check
+            if (!state.selectedCoachId) return; 
             const coachRef = doc(db, 'coaches', state.selectedCoachId);
             const coachToUpdate = state.coaches[state.selectedCoachId]; 
-            if (!coachToUpdate) return; // Simplified check
+            if (!coachToUpdate) return; 
 
             // Ensure session feedback array matches current rubric structure
             const updatedFeedback = Object.keys(rubricData).map(cat => {
@@ -289,7 +317,6 @@
 
         window.handleLogout = async () => {
             console.log("Logging out...");
-             // Reset state, ensure authReady stays true
              setState({ user: null, coaches: {}, currentView: 'coachList', loading: false, selectedCoachId: null, selectedSession: null, searchQuery: '', authReady: true }); 
             try {
                 await signOut(auth);
@@ -314,7 +341,6 @@
 
             try {
                 await updateDoc(coachRef, { goals: newGoals });
-                 // Update local state for immediate feedback
                  const updatedCoach = { ...state.coaches[state.selectedCoachId], goals: newGoals };
                  const updatedCoaches = { ...state.coaches, [state.selectedCoachId]: updatedCoach };
                  setState({ coaches: updatedCoaches }); 
@@ -376,7 +402,6 @@
         function LoginScreen() {
              const el = document.createElement('div');
             el.className = 'flex flex-col justify-center items-center h-screen bg-gray-100 p-4';
-            // Simplified: Removed Sign Up toggle
             el.innerHTML = `
                 <div class="login-card bg-white p-8 rounded-xl shadow-lg text-center">
                     <img src="bop-logo.png" alt="Bay of Plenty Rowing Logo" class="w-48 mx-auto mb-6">
@@ -401,12 +426,12 @@
             
              setTimeout(() => {
                 const button = el.querySelector('#auth-button');
-                const emailInput = el.querySelector('#email'); // Keep for potential future use, though readonly now
+                const emailInput = el.querySelector('#email'); 
                 const passwordInput = el.querySelector('#password');
                 const errorMsg = el.querySelector('#error-message');
 
                 button.addEventListener('click', async () => {
-                    const email = ADMIN_EMAIL; // Hardcoded
+                    const email = ADMIN_EMAIL; 
                     const password = passwordInput.value;
                     errorMsg.textContent = ''; 
 
@@ -421,13 +446,12 @@
 
                     try {
                         await signInWithEmailAndPassword(auth, email, password);
-                        // onAuthStateChanged handles success
                     } catch (error) {
-                        let userFriendlyError = "Invalid password."; // Default
+                        let userFriendlyError = "Invalid password."; 
                          if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
                             userFriendlyError = "Invalid password.";
                          } else {
-                             userFriendlyError = "Login failed. Please try again."; // General error
+                             userFriendlyError = "Login failed. Please try again."; 
                          }
                         errorMsg.textContent = userFriendlyError;
                         console.error("Auth Error:", error); 
@@ -436,9 +460,7 @@
                     } 
                 });
                 
-                // Add focus to password field
                  passwordInput.focus();
-                 // Allow Enter key submission from password field
                  passwordInput.addEventListener('keyup', (event) => {
                      if (event.key === 'Enter') {
                          button.click();
@@ -452,7 +474,6 @@
         }
 
         function Header({ title, onBack, rightContent }) {
-             // ... (Header function remains the same) ...
              return `
                 <header class="bg-white shadow-md p-4 flex justify-between items-center w-full sticky top-0 z-20">
                     <div class="flex items-center">
@@ -466,7 +487,6 @@
         }
         
         function CoachListScreen() {
-             // Admin check implied as only admin gets here now
             const el = document.createElement('div');
             el.className = 'p-4 md:p-8';
             const rightHeaderContent = `
@@ -479,7 +499,6 @@
                 const query = state.searchQuery.toLowerCase();
                 const nameMatch = coach && coach.name && coach.name.toLowerCase().includes(query);
                 const clubMatch = coach && coach.club && coach.club.toLowerCase().includes(query);
-                // Email match removed as email is no longer stored on coach profile
                 return nameMatch || clubMatch;
             });
 
@@ -514,8 +533,6 @@
         }
         
         function CoachDetailScreen() {
-             // ... (CoachDetailScreen structure remains mostly the same, ensureisAdmin checks removed where appropriate if only admin can reach) ...
-             // ... Chart rendering logic needs the prop-types fix from previous step ...
              const el = document.createElement('div');
             el.className = 'p-4 md:p-8';
              if (!state.selectedCoachId || !state.coaches[state.selectedCoachId]) {
@@ -525,7 +542,6 @@
              }
             const coach = state.coaches[state.selectedCoachId];
 
-            // Only admin reaches here, simplify header buttons
             const headerButtons = `
                 <button onclick="openCoachModal('${state.selectedCoachId}')" class="text-sm bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -558,11 +574,17 @@
                         </button>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        ${(coach.sessions || []).length > 0 ? (coach.sessions || []).sort((a,b) => new Date(b.date) - new Date(a.date)).map(session => `
+                        ${(coach.sessions || []).length > 0 ? (coach.sessions || []).sort((a,b) => new Date(b.date) - new Date(a.date)).map(session => {
+                            const avgScore = calculateAverageScore(session.feedback); // Calculate average
+                            return `
                             <div onclick='handleSelectSession(${JSON.stringify(session)})' class="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer">
                                 <p class="font-semibold text-gray-900">Session: ${new Date(session.date).toLocaleDateString('en-NZ', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                                <p class="text-sm text-gray-600 mt-1">Focus: ${session.focus || 'N/A'}</p>
-                            </div>`).join('') : `<p class="text-gray-500 md:col-span-2">No sessions recorded yet.</p>`
+                                <div class="flex items-center mt-1">
+                                    <p class="text-sm text-gray-600">Focus: ${session.focus || 'N/A'}</p>
+                                    ${avgScore !== '--' ? `<span class="avg-score bg-gray-200 text-gray-700">Avg: ${avgScore}</span>` : ''}
+                                </div>
+                            </div>`;
+                            }).join('') : `<p class="text-gray-500 md:col-span-2">No sessions recorded yet.</p>`
                         }
                     </div>
                 </main>`;
@@ -642,7 +664,6 @@
         }
 
         function SessionFeedbackScreen() {
-             // ... (SessionFeedbackScreen remains the same) ...
              const el = document.createElement('div');
              el.className = 'p-4 md:p-8';
              const coach = state.coaches[state.selectedCoachId];
@@ -650,6 +671,7 @@
                  el.innerHTML = `<p class="text-red-600">Error: Cannot load session, coach not found.</p>`;
                  return el;
              }
+             // Deep clone session to avoid modifying state directly during editing
              let session = state.selectedSession ? JSON.parse(JSON.stringify(state.selectedSession)) : {
                 id: `session-${Date.now()}-${Math.random().toString(16).slice(2)}`, 
                 date: new Date().toISOString().split('T')[0], 
@@ -659,6 +681,7 @@
                 actionPlan: '', 
                 athleteFeedback: ''
              };
+              // Ensure feedback array exists and matches rubric
              if (!session.feedback || session.feedback.length !== Object.keys(rubricData).length) {
                 session.feedback = Object.keys(rubricData).map(cat => {
                     const existing = (session.feedback || []).find(f => f.category === cat);
@@ -684,7 +707,10 @@
                        </button>`
                     : `<button onclick="handleGetAthleteFeedback()" class="bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors">Get Athlete Feedback</button>`;
 
-                const feedbackHTML = session.feedback ? Object.entries(rubricData).map(([category, data]) => {
+                // Calculate initial average score
+                 const initialAvgScore = calculateAverageScore(session.feedback);
+
+                 const feedbackHTML = session.feedback ? Object.entries(rubricData).map(([category, data]) => {
                         const currentFeedback = session.feedback.find(f => f.category === category) || { score: null, comments: "" };
                         return `
                         <div class="bg-white p-6 rounded-lg shadow mb-4">
@@ -707,9 +733,13 @@
                                 <label for="date" class="font-medium text-gray-700 block mb-2">Session Date:</label>
                                 <input type="date" name="date" value="${session.date}" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#00a99d] focus:border-[#00a99d] transition" />
                             </div>
-                            <div>
+                            <div class="relative">
                                 <label for="focus" class="font-medium text-gray-700 block mb-2">Session Focus:</label>
                                 <input type="text" name="focus" value="${session.focus || ''}" placeholder="e.g., Technical drills, race prep" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#00a99d] focus:border-[#00a99d] transition" />
+                                <div class="absolute top-[38px] right-2 flex items-center">
+                                     <span class="text-sm font-semibold text-gray-700 mr-1">Avg:</span>
+                                     <span id="session-avg-score" class="text-lg font-bold text-[#002d3c]">${initialAvgScore}</span>
+                                </div>
                             </div>
                             <div class="md:col-span-2">
                                 ${athleteFeedbackButtonHTML}
@@ -734,6 +764,14 @@
 
                 formContainer.innerHTML = formHTML;
 
+                 // Function to update average score display
+                 const updateAverageDisplay = () => {
+                     const avgScoreSpan = document.getElementById('session-avg-score');
+                     if (avgScoreSpan) {
+                         avgScoreSpan.textContent = calculateAverageScore(session.feedback);
+                     }
+                 };
+
                 formContainer.querySelectorAll('.score-btn').forEach(btn => {
                     btn.addEventListener('click', () => {
                         const category = btn.dataset.cat;
@@ -756,6 +794,8 @@
                             b.classList.toggle('font-bold', parseInt(b.dataset.score) === score);
                             b.classList.toggle('bg-gray-200', parseInt(b.dataset.score) !== score);
                         });
+                        // Recalculate and update average display
+                         updateAverageDisplay(); 
                     });
                 });
 
@@ -932,10 +972,11 @@
             try {
                 if (coachId) { // Editing
                     const coachRef = doc(db, 'coaches', coachId);
+                    // Removed email from update
                     await updateDoc(coachRef, { name, club });
                      alert('Coach updated.');
                 } else { // Adding
-                    // Use admin's UID for the userId field
+                    // Use admin's UID for the userId field, removed email
                     await addDoc(collection(db, 'coaches'), {
                         name, club,
                         sessions: [], goals: '', 
@@ -977,7 +1018,7 @@
                     console.log("Existing coaches deleted.");
 
                     const addPromises = Object.entries(restoredData).map(([coachId, coachData]) => {
-                        // Ensure essential fields and use logged-in admin's UID
+                        // Ensure essential fields and use logged-in admin's UID, remove email
                         const dataToSave = { 
                             name: coachData.name || "Unnamed Coach",
                             club: coachData.club || null,
@@ -1017,24 +1058,20 @@
              if (!authReady) {
                 console.log("Initial auth check complete.");
                 authReady = true; 
-                 // Set authReady, determine initial loading state based on currentUser
                  setState({ authReady: true, loading: !!currentUser, loadingMessage: currentUser ? "Authenticating..." : "" }); 
             }
 
             const newUserId = currentUser ? currentUser.uid : null;
 
-            // Only react if user ID changes OR it's the first time auth is ready
             if (newUserId !== currentUserId || !wasAuthReady) {
                 console.log("User change or initial auth. Prev ID:", currentUserId, "New ID:", newUserId);
                 currentUserId = newUserId; 
 
                 if (currentUser && currentUser.email === ADMIN_EMAIL) {
-                    // Correct admin user signed in
                      console.log("Admin user detected.");
                      setState({ user: currentUser, loadingMessage: "Loading coach data..." }); // Keep loading true
-                     loadDataForUser(currentUser); // Load data, will set loading=false
+                     loadDataForUser(currentUser); 
                 } else {
-                     // Not the admin user OR signed out
                      if (currentUser) {
                          console.warn("Non-admin user logged in, logging out.");
                          signOut(auth); // Force logout if not admin
@@ -1047,7 +1084,6 @@
                          unsubscribe(); 
                          unsubscribe = null;
                     }
-                    // Reset state and show login screen
                     setState({ 
                         user: null, 
                         authReady: true, 
@@ -1059,7 +1095,6 @@
                 }
             } else {
                  console.log("Auth state change for same user (token refresh?). No major state update.");
-                 // If auth is ready and not loading, just re-render in case
                  if (state.authReady && !state.loading) { 
                       renderApp(); 
                  }
@@ -1090,3 +1125,4 @@
     </script>
 </body>
 </html>
+
