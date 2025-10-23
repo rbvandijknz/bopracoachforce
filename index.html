@@ -30,6 +30,10 @@
                     <label for="coach-name-input" class="block text-sm font-medium text-gray-700">Coach Name</label>
                     <input type="text" id="coach-name-input" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-[#00a99d] focus:border-[#00a99d]">
                 </div>
+                 <div>
+                    <label for="coach-email-input" class="block text-sm font-medium text-gray-700">Coach Login Email</label>
+                    <input type="email" id="coach-email-input" placeholder="coach.email@example.com" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-[#00a99d] focus:border-[#00a99d]">
+                </div>
                 <div>
                     <label for="coach-club-select" class="block text-sm font-medium text-gray-700">Club</label>
                     <select id="coach-club-select" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-[#00a99d] focus:border-[#00a99d]">
@@ -49,10 +53,11 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, query, where, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, query, where, deleteDoc, updateDoc, getDocs } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 
-        // --- FIREBASE CONFIGURATION ---
+        // --- CONSTANTS ---
+        const ADMIN_EMAIL = 'merowing@xtra.co.nz';
         const firebaseConfig = {
             apiKey: "AIzaSyAVbGWN3LclrUZMtv-L7x0D8HF7OQ3viK8",
             authDomain: "bopracoachfeedback.firebaseapp.com",
@@ -62,8 +67,6 @@
             appId: "1:967552327697:web:f3a2e3ffa5d6c6a3f611b0",
             measurementId: "G-NRQ2HSJGT6"
         };
-
-        // --- RUBRIC DATA ---
         const rubricData = {
           "Understands the Sport": { description: "(technical, tactical, rules)", levels: ["Open to learning sport-specific knowledge.", "Starting to notice techniques and rules in action.", "Beginning to apply knowledge of techniques and rules with athletes.", "Using sport knowledge intentionally with athletes.", "Adapting technical/tactical elements confidently.", "Mentoring and sharing sport knowledge with others."] },
           "Understands Self": { description: "(leadership, philosophy, self-awareness, communication)", levels: ["Becoming aware of the coaching role and its impact.", "Noticing different coaching styles and effects.", "Starting to reflect on personal coaching style and values.", "Established a coaching philosophy and starting to implement.", "Adapting communication and coaching style to suit others' needs.", "Supporting others through clear, authentic leadership."] },
@@ -82,11 +85,13 @@
         let state = {
             loading: true,
             user: null, // This will be the firebase user object or null
-            coaches: {},
+            isAdmin: false,
+            coaches: {}, // For admin: all coaches; For coach: their own profile document { id: data }
             currentView: 'coachList', // Default view if logged in
-            selectedCoachId: null,
+            selectedCoachId: null, // Only relevant for admin view or coach viewing their own
             selectedSession: null,
             searchQuery: '',
+            coachProfileNotFound: false, // Flag for coaches whose profile isn't created yet
         };
         
         const root = document.getElementById('app');
@@ -110,6 +115,17 @@
                 return;
             }
 
+            if (state.coachProfileNotFound && !state.isAdmin) {
+                root.appendChild(CoachNotFoundScreen());
+                return;
+            }
+
+            // Coach user bypasses list view and goes straight to their details
+            if (!state.isAdmin && state.currentView === 'coachList' && Object.keys(state.coaches).length === 1) {
+                 state.selectedCoachId = Object.keys(state.coaches)[0]; // Set their own ID
+                 state.currentView = 'coachDetail'; // Force detail view
+            }
+
             switch(state.currentView) {
                 case 'coachDetail':
                     root.appendChild(CoachDetailScreen());
@@ -121,8 +137,19 @@
                     root.appendChild(AthleteFeedbackScreen());
                     break;
                 case 'coachList':
+                    if (state.isAdmin) {
+                         root.appendChild(CoachListScreen());
+                    } else {
+                         // Should have already been redirected to coachDetail, but as fallback:
+                         root.appendChild(CoachDetailScreen()); 
+                    }
+                    break;
                 default:
-                    root.appendChild(CoachListScreen());
+                     if (state.isAdmin) {
+                         root.appendChild(CoachListScreen());
+                    } else {
+                         root.appendChild(CoachDetailScreen()); 
+                    }
                     break;
             }
         }
@@ -134,7 +161,13 @@
         window.handleBack = () => {
             if (state.currentView === 'sessionFeedback') setState({ currentView: 'coachDetail' });
             else if (state.currentView === 'athleteFeedback') setState({ currentView: 'sessionFeedback' });
-            else if (state.currentView === 'coachDetail') setState({ currentView: 'coachList', selectedCoachId: null });
+            else if (state.currentView === 'coachDetail') {
+                 if (state.isAdmin) {
+                    setState({ currentView: 'coachList', selectedCoachId: null });
+                 } else {
+                     // Coaches can't go 'back' from their detail view, maybe logout? Or do nothing.
+                 }
+            }
         };
        
         window.handleSaveSession = async (sessionData) => {
@@ -151,18 +184,31 @@
                 updatedSessions = [...(coachToUpdate.sessions || []), sessionData];
             }
             
-            await updateDoc(coachRef, { sessions: updatedSessions });
-            
-            // Go back to coach detail view after saving
-            if (state.currentView !== 'coachDetail') {
-                 setState({ currentView: 'coachDetail' });
+            try {
+                await updateDoc(coachRef, { sessions: updatedSessions });
+                
+                // Update local state for immediate UI feedback
+                 state.coaches[state.selectedCoachId].sessions = updatedSessions;
+                 state.selectedSession = sessionData; // Keep the updated session in state if editing
+
+                // Go back to coach detail view after saving
+                if (state.currentView !== 'coachDetail') {
+                     setState({ currentView: 'coachDetail' });
+                } else {
+                    renderApp(); // Re-render if already on detail view
+                }
+            } catch (error) {
+                console.error("Error saving session: ", error);
+                alert("Failed to save session feedback. Please check permissions or network.");
             }
         };
         
         window.handleDeleteCoach = async (coachId, coachName) => {
+             if (!state.isAdmin) return; // Only admin can delete
              if (confirm(`Are you sure you want to delete ${coachName}? This action cannot be undone.`)) {
                 try {
                     await deleteDoc(doc(db, 'coaches', coachId));
+                    // The onSnapshot listener will automatically update the UI
                 } catch (error) {
                     console.error("Error deleting coach:", error);
                     alert("Failed to delete coach. Please try again.");
@@ -171,6 +217,8 @@
         };
 
         window.handleLogout = async () => {
+             // Reset state before signing out to prevent flashing old data
+             setState({ user: null, isAdmin: false, coaches: {}, coachProfileNotFound: false, currentView: 'coachList', loading: false }); 
             await signOut(auth);
         };
         
@@ -183,6 +231,7 @@
 
             try {
                 await updateDoc(coachRef, { goals: newGoals });
+                 state.coaches[state.selectedCoachId].goals = newGoals; // Update local state
                 alert('Goals saved successfully!');
             } catch (error) {
                 console.error("Error saving goals:", error);
@@ -202,7 +251,9 @@
             // Immediately save this change back to the main session data
             await handleSaveSession(currentSession);
             // Go back to the session feedback screen
-            setState({ currentView: 'sessionFeedback', selectedSession: currentSession });
+             // handleSaveSession now handles navigation, update state here
+             state.selectedSession.athleteFeedback = feedbackText;
+             setState({ currentView: 'sessionFeedback' }); 
         };
         
         window.handleSearch = (query) => {
@@ -218,7 +269,7 @@
                 <div class="login-card bg-white p-8 rounded-xl shadow-lg text-center">
                     <img src="bop-logo.png" alt="Bay of Plenty Rowing Logo" class="w-48 mx-auto mb-6">
                     <h1 id="auth-title" class="text-2xl font-bold text-gray-800 mb-2">Login</h1>
-                    <p class="text-gray-600 mb-6">Enter your credentials to access your coach data.</p>
+                    <p class="text-gray-600 mb-6">Enter your credentials to access the coach development app.</p>
                     <div class="space-y-4 text-left">
                         <div>
                            <label for="email" class="block text-sm font-medium text-gray-700">Email Address</label>
@@ -233,31 +284,74 @@
                         Sign In
                     </button>
                     <p id="error-message" class="text-red-500 mt-4 h-5"></p>
+                    <p class="mt-4 text-sm">
+                        <a href="#" id="auth-toggle" class="font-medium text-[#00a99d] hover:text-[#002d3c]">Need an account? Sign Up</a>
+                    </p>
                 </div>
             `;
             
-            setTimeout(() => {
+             setTimeout(() => {
+                const title = el.querySelector('#auth-title');
                 const button = el.querySelector('#auth-button');
+                const toggle = el.querySelector('#auth-toggle');
                 const emailInput = el.querySelector('#email');
                 const passwordInput = el.querySelector('#password');
                 const errorMsg = el.querySelector('#error-message');
-                const ALLOWED_EMAIL = 'merowing@xtra.co.nz';
+                let isLogin = true;
+
+                toggle.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    isLogin = !isLogin;
+                    title.textContent = isLogin ? 'Login' : 'Sign Up';
+                    button.textContent = isLogin ? 'Sign In' : 'Create Account';
+                    toggle.innerHTML = isLogin ? 'Need an account? Sign Up' : 'Already have an account? Sign In';
+                    errorMsg.textContent = '';
+                });
 
                 button.addEventListener('click', async () => {
                     const email = emailInput.value;
                     const password = passwordInput.value;
                     errorMsg.textContent = '';
 
-                    if (email.toLowerCase() !== ALLOWED_EMAIL) {
-                        errorMsg.textContent = 'Invalid email address.';
+                    // Basic validation
+                    if (!email || !password) {
+                        errorMsg.textContent = "Please enter both email and password.";
+                        return;
+                    }
+                    if (password.length < 6 && !isLogin) { // Password length check only for sign up
+                        errorMsg.textContent = "Password must be at least 6 characters.";
                         return;
                     }
 
+
                     try {
-                        await signInWithEmailAndPassword(auth, email, password);
+                        setState({ loading: true }); // Show loading indicator during auth
+                        if (isLogin) {
+                            await signInWithEmailAndPassword(auth, email, password);
+                            // onAuthStateChanged will handle successful login & profile check
+                        } else {
+                            // Allow account creation, but profile check happens in onAuthStateChanged
+                             if (email.toLowerCase() === ADMIN_EMAIL) {
+                                 throw new Error("Cannot sign up with admin email address.");
+                             }
+                             await createUserWithEmailAndPassword(auth, email, password);
+                             // User is automatically signed in after creation.
+                             // onAuthStateChanged will run, loadDataForUser will check if profile exists.
+                             // If no profile, coachProfileNotFound state will be set.
+                        }
                     } catch (error) {
-                        errorMsg.textContent = error.message.replace('Firebase: ','');
-                    }
+                         let userFriendlyError = error.message.replace('Firebase: ','');
+                         if (error.code === 'auth/email-already-in-use') {
+                             userFriendlyError = "An account with this email already exists. Try signing in instead.";
+                         } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                            userFriendlyError = "Invalid email or password.";
+                         } else if (error.code === 'auth/invalid-email') {
+                            userFriendlyError = "Please enter a valid email address.";
+                         }
+                        errorMsg.textContent = userFriendlyError;
+                        console.error("Auth Error:", error); // Keep detailed error in console
+                        setState({ loading: false }); // Hide loading on error
+                    } 
                 });
 
             }, 0);
@@ -279,6 +373,9 @@
         }
         
         function CoachListScreen() {
+             // Should only be rendered for admin
+            if (!state.isAdmin) return document.createElement('div'); 
+
             const el = document.createElement('div');
             el.className = 'p-4 md:p-8';
             const rightHeaderContent = `
@@ -289,13 +386,17 @@
 
             const filteredCoaches = Object.entries(state.coaches).filter(([id, coach]) => {
                 const query = state.searchQuery.toLowerCase();
-                return coach.name.toLowerCase().includes(query) || (coach.club && coach.club.toLowerCase().includes(query));
+                 // Check if coach and coach.name exist before calling toLowerCase
+                const nameMatch = coach && coach.name && coach.name.toLowerCase().includes(query);
+                const clubMatch = coach && coach.club && coach.club.toLowerCase().includes(query);
+                const emailMatch = coach && coach.email && coach.email.toLowerCase().includes(query);
+                return nameMatch || clubMatch || emailMatch;
             });
 
             el.innerHTML = `
-                ${Header({ title: "Rowing Coaches", rightContent: rightHeaderContent })}
+                ${Header({ title: "Rowing Coaches (Admin)", rightContent: rightHeaderContent })}
                 <div class="mt-6 mb-4">
-                    <input type="search" oninput="handleSearch(this.value)" value="${state.searchQuery}" placeholder="Search by name or club..." class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-[#00a99d] focus:border-[#00a99d]">
+                    <input type="search" oninput="handleSearch(this.value)" value="${state.searchQuery}" placeholder="Search by name, email or club..." class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-[#00a99d] focus:border-[#00a99d]">
                 </div>
                 <main class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     ${filteredCoaches.map(([id, coach]) => `
@@ -307,6 +408,7 @@
                                 <div>
                                     <h3 class="text-lg font-semibold text-gray-900">${coach.name}</h3>
                                     <p class="text-sm text-gray-600">${coach.club || 'No club assigned'}</p>
+                                    <p class="text-xs text-gray-500">${coach.email || 'No email assigned'}</p>
                                     <p class="text-xs text-gray-400 mt-1">${(coach.sessions || []).length} session${(coach.sessions || []).length !== 1 ? 's' : ''} recorded</p>
                                 </div>
                             </div>
@@ -316,7 +418,7 @@
                         </div>`).join('')}
                     <button onclick="openCoachModal()" class="bg-gray-100 p-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-[#00a99d] hover:bg-teal-50 transition-all flex flex-col items-center justify-center text-gray-500 hover:text-[#00a99d]">
                          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                        <span class="mt-2 font-semibold">Add New Coach</span>
+                        <span class="mt-2 font-semibold">Add New Coach Profile</span>
                     </button>
                 </main>`;
             return el;
@@ -325,29 +427,48 @@
         function CoachDetailScreen() {
             const el = document.createElement('div');
             el.className = 'p-4 md:p-8';
+             // Ensure selectedCoachId exists and the coach data is loaded
+            if (!state.selectedCoachId || !state.coaches[state.selectedCoachId]) {
+                 el.innerHTML = `<p class="text-center text-red-600 mt-10">Error: Could not load coach data.</p>`;
+                 // Add appropriate back/logout buttons based on role
+                 if (state.isAdmin) {
+                     el.innerHTML += `<div class="text-center mt-4"><button onclick="setState({currentView: 'coachList', selectedCoachId: null})" class="bg-gray-200 p-2 rounded">Back to List</button></div>`;
+                 } else {
+                     el.innerHTML += `<div class="text-center mt-4"><button onclick="handleLogout()" class="bg-gray-200 p-2 rounded">Logout</button></div>`;
+                 }
+                 return el;
+             }
             const coach = state.coaches[state.selectedCoachId];
 
-            const editButton = `<button onclick="openCoachModal('${state.selectedCoachId}')" class="text-sm bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                Edit Coach
-            </button>`;
+            let headerButtons = '';
+            if (state.isAdmin) {
+                headerButtons = `<button onclick="openCoachModal('${state.selectedCoachId}')" class="text-sm bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    Edit Profile
+                </button>`;
+                 headerButtons += `<button onclick="handleLogout()" class="ml-2 text-sm bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300">Logout</button>`; // Add logout for admin too
+            } else {
+                 headerButtons = `<button onclick="handleLogout()" class="text-sm bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300">Logout</button>`;
+            }
 
             el.innerHTML = `
-                ${Header({ title: coach.name, onBack: 'handleBack()', rightContent: editButton })}
+                ${Header({ title: coach.name, onBack: state.isAdmin ? 'handleBack()' : null, rightContent: headerButtons })}
                 <main class="mt-8">
                     <p class="text-lg font-semibold text-[#00a99d] -mt-4 mb-6">${coach.club || 'No Club Assigned'}</p>
                     
                     <div class="bg-white p-6 rounded-lg shadow mb-8">
                         <h2 class="text-2xl font-bold text-gray-800 mb-4">Overall Goals</h2>
-                        <textarea id="coach-goals-textarea" class="w-full p-2 border border-gray-300 rounded-md h-32" placeholder="Enter the coach's long-term development goals...">${coach.goals || ''}</textarea>
+                        <textarea id="coach-goals-textarea" ${state.isAdmin ? '' : 'readonly'} class="w-full p-2 border border-gray-300 rounded-md h-32 ${state.isAdmin ? '' : 'bg-gray-100'}" placeholder="${state.isAdmin ? "Enter the coach's long-term development goals..." : "Goals set by admin"}">${coach.goals || ''}</textarea>
                         <div class="flex justify-end mt-4">
-                            <button onclick="handleSaveGoals()" class="bg-[#002d3c] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#004e69] transition-colors">Save Goals</button>
+                             <!-- Only Admin can save goals now -->
+                            <button onclick="handleSaveGoals()" class="bg-[#002d3c] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#004e69] transition-colors ${state.isAdmin ? '' : 'hidden'}">Save Goals</button> 
                         </div>
                     </div>
 
                     <div id="chart-container" class="bg-white p-6 rounded-lg shadow mb-8"></div>
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold text-gray-800">Session History</h2>
+                         <!-- Both admin and coach can add sessions for the viewed coach -->
                         <button onclick="handleNewSession()" class="bg-[#002d3c] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#004e69] transition-colors flex items-center">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                              New Session
@@ -357,7 +478,7 @@
                         ${(coach.sessions || []).length > 0 ? (coach.sessions || []).sort((a,b) => new Date(b.date) - new Date(a.date)).map(session => `
                             <div onclick='handleSelectSession(${JSON.stringify(session)})' class="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer">
                                 <p class="font-semibold text-gray-900">Session: ${new Date(session.date).toLocaleDateString('en-NZ', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                                <p class="text-sm text-gray-600 mt-1">Focus: ${session.focus}</p>
+                                <p class="text-sm text-gray-600 mt-1">Focus: ${session.focus || 'N/A'}</p>
                             </div>`).join('') : `<p class="text-gray-500 md:col-span-2">No sessions recorded yet.</p>`
                         }
                     </div>
@@ -403,11 +524,23 @@
              const el = document.createElement('div');
              el.className = 'p-4 md:p-8';
              const coach = state.coaches[state.selectedCoachId];
-             let session = state.selectedSession || {
-                id: `session-${Date.now()}`, date: new Date().toISOString().split('T')[0], focus: '',
+             // Deep clone session to avoid modifying state directly during editing
+             let session = state.selectedSession ? JSON.parse(JSON.stringify(state.selectedSession)) : {
+                id: `session-${Date.now()}-${Math.random().toString(16).slice(2)}`, 
+                date: new Date().toISOString().split('T')[0], 
+                focus: '',
                 feedback: Object.keys(rubricData).map(cat => ({ category: cat, score: null, comments: '' })),
-                summary: '', actionPlan: '', athleteFeedback: ''
+                summary: '', 
+                actionPlan: '', 
+                athleteFeedback: ''
              };
+              // Ensure feedback array exists and is populated
+             if (!session.feedback || session.feedback.length !== Object.keys(rubricData).length) {
+                session.feedback = Object.keys(rubricData).map(cat => {
+                    const existing = (session.feedback || []).find(f => f.category === cat);
+                    return existing || { category: cat, score: null, comments: '' };
+                });
+             }
              
              el.innerHTML = `
                 ${Header({ title: `${state.selectedSession ? 'Edit' : 'New'} Session for ${coach.name}`, onBack: 'handleBack()' })}
@@ -437,7 +570,7 @@
                             </div>
                             <div>
                                 <label for="focus" class="font-medium text-gray-700 block mb-2">Session Focus:</label>
-                                <input type="text" name="focus" value="${session.focus}" placeholder="e.g., Technical drills, race prep" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#00a99d] focus:border-[#00a99d] transition" />
+                                <input type="text" name="focus" value="${session.focus || ''}" placeholder="e.g., Technical drills, race prep" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#00a99d] focus:border-[#00a99d] transition" />
                             </div>
                             <div class="md:col-span-2">
                                 ${athleteFeedbackButtonHTML}
@@ -445,7 +578,7 @@
                         </div>
                     </div>
                     ${Object.entries(rubricData).map(([category, data]) => {
-                        const currentFeedback = (session.feedback || []).find(f => f.category === category) || { score: -1, comments: "" };
+                        const currentFeedback = (session.feedback || []).find(f => f.category === category) || { score: null, comments: "" };
                         return `
                         <div class="bg-white p-6 rounded-lg shadow mb-4">
                             <h3 class="text-xl font-semibold text-gray-800">${category}</h3>
@@ -454,7 +587,7 @@
                                <div class="flex justify-between text-xs text-gray-600 px-1 mb-4">
                                 ${[...Array(6)].map((_, i) => `<button data-cat="${category}" data-score="${i}" class="score-btn w-10 h-10 flex items-center justify-center rounded-full transition-colors ${currentFeedback.score === i ? 'bg-[#00a99d] text-white font-bold' : 'bg-gray-200 hover:bg-teal-100'}">${i}</button>`).join('')}
                                </div>
-                               <p class="text-gray-700 mb-4 h-12"><strong>Description: </strong><span id="desc-${category.replace(/\s+/g, '')}">${currentFeedback.score > -1 ? data.levels[currentFeedback.score] : "Select a rating."}</span></p>
+                               <p class="text-gray-700 mb-4 h-12"><strong>Description: </strong><span id="desc-${category.replace(/\s+/g, '')}">${currentFeedback.score !== null && currentFeedback.score > -1 ? data.levels[currentFeedback.score] : "Select a rating."}</span></p>
                                <textarea name="comments" data-cat="${category}" rows="4" class="w-full p-2 border border-gray-300 rounded-md" placeholder="Add specific examples...">${currentFeedback.comments || ''}</textarea>
                             </div>
                         </div>`
@@ -481,9 +614,9 @@
                         const category = btn.dataset.cat;
                         const score = parseInt(btn.dataset.score);
                         const fbIndex = session.feedback.findIndex(f => f.category === category);
+                        if(fbIndex === -1) { return; } 
                         session.feedback[fbIndex].score = score;
                         
-                        // Update UI
                         document.getElementById(`desc-${category.replace(/\s+/g, '')}`).textContent = rubricData[category].levels[score];
                         formContainer.querySelectorAll(`.score-btn[data-cat="${category}"]`).forEach(b => {
                             b.classList.toggle('bg-[#00a99d]', parseInt(b.dataset.score) === score);
@@ -501,9 +634,12 @@
                     session.actionPlan = formContainer.querySelector('textarea[name="actionPlan"]').value;
                     formContainer.querySelectorAll('textarea[name="comments"]').forEach(textarea => {
                         const category = textarea.dataset.cat;
-                        const fbIndex = session.feedback.findIndex(f => f.category === category);
-                        session.feedback[fbIndex].comments = textarea.value;
+                         const fbIndex = session.feedback.findIndex(f => f.category === category);
+                         if (fbIndex > -1) { 
+                             session.feedback[fbIndex].comments = textarea.value;
+                         } 
                     });
+                     session.athleteFeedback = state.selectedSession?.athleteFeedback || session.athleteFeedback || ''; 
                     handleSaveSession(session);
                 });
 
@@ -524,7 +660,7 @@
                      <div class="bg-white p-6 rounded-lg shadow text-center">
                         <h2 class="text-2xl font-bold text-gray-800">Feedback for ${coach.name}</h2>
                         <p class="text-gray-600 mt-1">Session on ${new Date(session.date).toLocaleDateString('en-NZ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                        <p class="text-gray-600">Focus: ${session.focus}</p>
+                        <p class="text-gray-600">Focus: ${session.focus || 'N/A'}</p>
                         
                         <div class="mt-6 text-left">
                             <label for="athlete-feedback-textarea" class="font-medium text-gray-700 block mb-2">Your Feedback:</label>
@@ -541,32 +677,97 @@
             `;
             return el;
         }
+        
+        function CoachNotFoundScreen() {
+            const el = document.createElement('div');
+            el.className = 'p-4 md:p-8 flex flex-col items-center justify-center h-screen text-center';
+            const logoutButton = `<button onclick="handleLogout()" class="text-sm bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 mt-6">Logout</button>`;
+             el.innerHTML = `
+                <img src="bop-logo.png" alt="Bay of Plenty Rowing Logo" class="w-48 mx-auto mb-6">
+                <h1 class="text-2xl font-bold text-gray-800 mb-2">Profile Not Found</h1>
+                <p class="text-gray-600">Your coach profile has not been created by the administrator yet.</p>
+                <p class="text-gray-600">Please contact ${ADMIN_EMAIL} to have your profile set up.</p>
+                ${logoutButton}
+             `;
+             return el;
+        }
 
 
         // --- INITIALIZATION ---
         let unsubscribe; // To hold the onSnapshot listener
 
-        function loadDataForCurrentUser(user) {
+        async function loadDataForUser(user) {
             if (!user || !user.uid) return;
             
-            const coachesQuery = query(collection(db, 'coaches'), where("userId", "==", user.uid));
-            unsubscribe = onSnapshot(coachesQuery, (querySnapshot) => {
+            setState({ loading: true, coachProfileNotFound: false }); // Show loading indicator
+            
+            const isAdmin = user.email === ADMIN_EMAIL;
+            let dataQuery;
+            
+            if (isAdmin) {
+                // Admin: Fetch all coaches
+                dataQuery = query(collection(db, 'coaches'));
+            } else {
+                // Coach: Fetch only their profile linked by email
+                dataQuery = query(collection(db, 'coaches'), where("email", "==", user.email));
+            }
+
+            // Clean up previous listener if exists
+            if (unsubscribe) unsubscribe();
+
+            unsubscribe = onSnapshot(dataQuery, (querySnapshot) => {
                 const coachesData = {};
                 querySnapshot.forEach((doc) => {
                     coachesData[doc.id] = { id: doc.id, ...doc.data() };
                 });
-                setState({ coaches: coachesData });
+
+                if (!isAdmin && querySnapshot.empty) {
+                    // Coach logged in, but their profile doesn't exist yet
+                    setState({ 
+                        isAdmin: false, 
+                        coaches: {}, 
+                        loading: false, 
+                        coachProfileNotFound: true,
+                        currentView: 'coachList' // Ensure view is reset
+                    });
+                } else if (!isAdmin && querySnapshot.size === 1) {
+                     // Coach found their profile, set selectedCoachId immediately
+                    const coachId = querySnapshot.docs[0].id;
+                    setState({ 
+                        isAdmin: false, 
+                        coaches: coachesData, 
+                        loading: false, 
+                        coachProfileNotFound: false,
+                        selectedCoachId: coachId, // Automatically select their profile
+                        currentView: 'coachDetail' // Go straight to detail view
+                    });
+                }
+                 else {
+                     // Admin or other cases (e.g., multiple profiles found for coach - data issue)
+                    setState({ 
+                        isAdmin: isAdmin, 
+                        coaches: coachesData, 
+                        loading: false, 
+                        coachProfileNotFound: false,
+                        currentView: 'coachList' // Default to list for admin
+                     });
+                }
+
             }, (error) => {
                 console.error("Firestore Error: ", error);
                 alert("Could not load data. Check console for an error message.");
+                setState({ loading: false, coachProfileNotFound: false }); // Stop loading on error
             });
         }
 
         // --- MODAL & BACKUP/RESTORE HANDLING ---
         window.openCoachModal = (coachId = null) => {
+            if (!state.isAdmin) return; // Only admin can open modal
+
             const modal = document.getElementById('coach-modal');
             const title = document.getElementById('modal-title');
             const nameInput = document.getElementById('coach-name-input');
+            const emailInput = document.getElementById('coach-email-input');
             const clubSelect = document.getElementById('coach-club-select');
             const coachIdInput = document.getElementById('coach-id-input');
 
@@ -576,14 +777,16 @@
             if (coachId) {
                 // Editing existing coach
                 const coach = state.coaches[coachId];
-                title.textContent = 'Edit Coach';
+                title.textContent = 'Edit Coach Profile';
                 nameInput.value = coach.name;
+                emailInput.value = coach.email || '';
                 clubSelect.value = coach.club;
                 coachIdInput.value = coachId;
             } else {
                 // Adding new coach
-                title.textContent = 'Add New Coach';
+                title.textContent = 'Add New Coach Profile';
                 nameInput.value = '';
+                emailInput.value = '';
                 clubSelect.value = clubs[0];
                 coachIdInput.value = '';
             }
@@ -599,47 +802,77 @@
         }
 
         async function saveCoach() {
+             if (!state.isAdmin) return; // Only admin can save
+
             const nameInput = document.getElementById('coach-name-input');
+            const emailInput = document.getElementById('coach-email-input');
             const clubSelect = document.getElementById('coach-club-select');
             const coachIdInput = document.getElementById('coach-id-input');
             
             const name = nameInput.value.trim();
+            const email = emailInput.value.trim().toLowerCase();
             const club = clubSelect.value;
             const coachId = coachIdInput.value;
 
-            if (!name) {
-                alert("Please enter a coach's name.");
+            if (!name || !email) {
+                alert("Please enter both coach's name and login email.");
+                return;
+            }
+             // Basic email format check
+            if (!/^\S+@\S+\.\S+$/.test(email)) {
+                alert("Please enter a valid email address.");
                 return;
             }
 
+
             if (!state.user || !state.user.uid) {
-                 alert("Could not save coach because you are not properly signed in. Please refresh the page.");
+                 alert("Could not save coach profile because you are not properly signed in. Please refresh the page.");
                  return;
             }
 
             try {
+                 // Check if email is already in use by another coach profile (unless editing the same coach)
+                 const q = query(collection(db, "coaches"), where("email", "==", email));
+                 const querySnapshot = await getDocs(q);
+                 let emailInUse = false;
+                 querySnapshot.forEach((doc) => {
+                     if (doc.id !== coachId) { // If email found belongs to a DIFFERENT coach
+                         emailInUse = true;
+                     }
+                 });
+
+                 if (emailInUse) {
+                     alert(`The email address ${email} is already assigned to another coach profile. Please use a unique email.`);
+                     return;
+                 }
+
+
                 if (coachId) {
-                    // Update existing coach
+                    // Update existing coach profile
                     const coachRef = doc(db, 'coaches', coachId);
-                    await updateDoc(coachRef, { name, club });
+                    await updateDoc(coachRef, { name, email, club });
+                     alert('Coach profile updated. Make sure the user account exists in Firebase Authentication.');
                 } else {
-                    // Add new coach
+                    // Add new coach profile - Use admin's UID as the creator/manager
                     await addDoc(collection(db, 'coaches'), {
                         name,
+                        email, // Store the coach's login email
                         club,
                         sessions: [],
-                        goals: '', // Initialize goals field for new coaches
-                        userId: state.user.uid
+                        goals: '', 
+                        userId: state.user.uid // Admin's UID is the owner/creator
                     });
+                     alert('Coach profile created. You must now create their login account in the Firebase Authentication console using the email: ' + email);
                 }
                 closeCoachModal();
             } catch (error) {
-                console.error("Error saving coach: ", error);
-                alert("Failed to save coach. Please check the console for errors.");
+                console.error("Error saving coach profile: ", error);
+                alert("Failed to save coach profile. Please check the console for errors.");
             }
         }
         
         window.handleBackupData = () => {
+             if (!state.isAdmin) return; // Only admin
             if (Object.keys(state.coaches).length === 0) {
                 alert("There is no data to back up.");
                 return;
@@ -656,14 +889,17 @@
         };
 
         window.handleRestoreClick = () => {
+             if (!state.isAdmin) return; // Only admin
             document.getElementById('restore-input').click();
         };
 
         async function handleFileSelected(event) {
+             if (!state.isAdmin) return; // Only admin
+
             const file = event.target.files[0];
             if (!file) return;
 
-            if (!confirm("Are you sure you want to restore from this file? This will permanently delete all your current coach data and replace it with the data from the backup. This action cannot be undone.")) {
+            if (!confirm("ADMIN ACTION: Are you sure you want to restore from this file? This will permanently delete ALL current coach data and replace it with the data from the backup. This action cannot be undone.")) {
                 event.target.value = null;
                 return;
             }
@@ -680,26 +916,33 @@
 
                     setState({ loading: true });
 
-                    // Delete all existing coaches for this user
-                    const deletePromises = Object.keys(state.coaches).map(coachId => deleteDoc(doc(db, 'coaches', coachId)));
+                    // Delete ALL existing coaches (more robust for admin restore)
+                    const currentCoachesSnapshot = await getDocs(collection(db, 'coaches'));
+                    const deletePromises = currentCoachesSnapshot.docs.map(d => deleteDoc(d.ref));
                     await Promise.all(deletePromises);
 
                     // Add all coaches from the backup file
                     const addPromises = Object.entries(restoredData).map(([coachId, coachData]) => {
-                        const dataToSave = { ...coachData, userId: state.user.uid };
-                        delete dataToSave.id;
-                        return setDoc(doc(db, 'coaches', coachId), dataToSave);
+                         // Ensure userId exists, default to admin's if missing in backup
+                        const dataToSave = { 
+                            ...coachData, 
+                            userId: coachData.userId || state.user.uid // Use backed up userId or admin's
+                         };
+                        delete dataToSave.id; // Don't save the key as a field
+                        // Use the original ID from the backup file as the document ID
+                        return setDoc(doc(db, 'coaches', coachId), dataToSave); 
                     });
                     await Promise.all(addPromises);
 
-                    alert("Restore successful! Your data has been updated.");
+                    alert("Restore successful! All data has been updated.");
 
                 } catch (error) {
                     console.error("Restore failed:", error);
                     alert("Restore failed. The backup file may be corrupted or in the wrong format.");
                 } finally {
-                    setState({ loading: false });
-                    event.target.value = null;
+                     // Trigger a fresh load after restore
+                    await loadDataForUser(state.user); // Reload data which also sets loading: false
+                    event.target.value = null; // Clear file input
                 }
             };
             reader.readAsText(file);
@@ -709,13 +952,19 @@
         // --- APP STARTUP ---
         onAuthStateChanged(auth, (currentUser) => {
             if (currentUser) {
-                // User is signed in.
-                setState({ user: currentUser, loading: false, currentView: 'coachList' });
-                loadDataForCurrentUser(currentUser);
+                // User is signed in. Check profile existence before setting state.
+                 loadDataForUser(currentUser); 
             } else {
                 // User is signed out.
                 if (unsubscribe) unsubscribe(); // Stop listening to old data
-                setState({ user: null, loading: false, coaches: {} });
+                setState({ 
+                    user: null, 
+                    isAdmin: false, 
+                    loading: false, 
+                    coaches: {}, 
+                    coachProfileNotFound: false,
+                    currentView: 'coachList' // Ensure it resets to default/login
+                 });
             }
         });
 
