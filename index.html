@@ -18,7 +18,7 @@
     </style>
 </head>
 <body class="bg-gray-50">
-    <div id="app"></div>
+    <div id="app"><div class="flex justify-center items-center h-screen bg-gray-50"><p class="text-lg text-gray-700">Initializing Application...</p></div></div>
 
     <!-- Add/Edit Coach Modal -->
     <div id="coach-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
@@ -77,13 +77,25 @@
         const levelNames = ["Emerging", "Exploring", "Developing", "Applying", "Integrating", "Leading"];
         const clubs = ["Bay of Plenty Coast", "Rotorua", "Taupo", "Tauranga", "Whakatane", "Tauranga Boys' College"];
         
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
+        let app;
+        let db;
+        let auth;
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            console.log("Firebase Initialized Successfully");
+        } catch (error) {
+            console.error("Firebase Initialization Failed:", error);
+            document.getElementById('app').innerHTML = `<div class="p-8 text-center text-red-600">Failed to initialize Firebase. Check console for details.</div>`;
+            // Stop further execution if Firebase fails to initialize
+            throw new Error("Firebase init failed"); 
+        }
 
         // --- APPLICATION STATE ---
         let state = {
-            loading: true,
+            loading: true, // Start in loading state
+            loadingMessage: "Initializing Application...",
             user: null, // This will be the firebase user object or null
             isAdmin: false,
             coaches: {}, // For admin: all coaches; For coach: their own profile document { id: data }
@@ -98,6 +110,7 @@
 
         // --- STATE MANAGEMENT & RENDERING ---
         function setState(newState) {
+            console.log("Setting State:", newState); // Log state changes
             state = { ...state, ...newState };
             renderApp();
         }
@@ -106,7 +119,7 @@
             root.innerHTML = ''; // Clear the screen
             
             if (state.loading) {
-                 root.innerHTML = `<div class="flex justify-center items-center h-screen bg-gray-50"><p class="text-lg text-gray-700">Loading Application...</p></div>`;
+                 root.innerHTML = `<div class="flex justify-center items-center h-screen bg-gray-50"><p class="text-lg text-gray-700">${state.loadingMessage}</p></div>`;
                  return;
             }
             
@@ -122,8 +135,12 @@
 
             // Coach user bypasses list view and goes straight to their details
             if (!state.isAdmin && state.currentView === 'coachList' && Object.keys(state.coaches).length === 1) {
+                 console.log("Coach detected, redirecting to detail view");
                  state.selectedCoachId = Object.keys(state.coaches)[0]; // Set their own ID
                  state.currentView = 'coachDetail'; // Force detail view
+                 // Needs direct call to render the correct view immediately
+                 root.appendChild(CoachDetailScreen()); 
+                 return; 
             }
 
             switch(state.currentView) {
@@ -140,15 +157,24 @@
                     if (state.isAdmin) {
                          root.appendChild(CoachListScreen());
                     } else {
-                         // Should have already been redirected to coachDetail, but as fallback:
-                         root.appendChild(CoachDetailScreen()); 
+                        // Redirect logged in coach without profile to not found screen
+                        if (Object.keys(state.coaches).length === 0) {
+                             root.appendChild(CoachNotFoundScreen());
+                        } else {
+                             // Should have already been redirected to coachDetail, but as fallback:
+                             root.appendChild(CoachDetailScreen()); 
+                        }
                     }
                     break;
                 default:
                      if (state.isAdmin) {
                          root.appendChild(CoachListScreen());
                     } else {
-                         root.appendChild(CoachDetailScreen()); 
+                        if (Object.keys(state.coaches).length === 0) {
+                             root.appendChild(CoachNotFoundScreen());
+                        } else {
+                             root.appendChild(CoachDetailScreen()); 
+                        }
                     }
                     break;
             }
@@ -165,50 +191,64 @@
                  if (state.isAdmin) {
                     setState({ currentView: 'coachList', selectedCoachId: null });
                  } else {
-                     // Coaches can't go 'back' from their detail view, maybe logout? Or do nothing.
+                     // Coaches can't go 'back' from their detail view.
                  }
             }
         };
        
         window.handleSaveSession = async (sessionData) => {
+            if (!state.selectedCoachId) {
+                console.error("Cannot save session, no coach selected.");
+                alert("Error: No coach is selected.");
+                return;
+            }
             const coachRef = doc(db, 'coaches', state.selectedCoachId);
-            const coachToUpdate = state.coaches[state.selectedCoachId];
+            // Ensure we are working with the latest coach data from state
+            const coachToUpdate = state.coaches[state.selectedCoachId]; 
+            if (!coachToUpdate) {
+                console.error("Cannot save session, coach data not found in state for ID:", state.selectedCoachId);
+                alert("Error: Could not find coach data to update.");
+                return;
+            }
+
             const sessionIndex = (coachToUpdate.sessions || []).findIndex(s => s.id === sessionData.id);
             let updatedSessions;
 
             if (sessionIndex > -1) {
-                // Update existing session
                 updatedSessions = coachToUpdate.sessions.map(s => s.id === sessionData.id ? sessionData : s);
             } else {
-                // Add new session
                 updatedSessions = [...(coachToUpdate.sessions || []), sessionData];
             }
             
             try {
                 await updateDoc(coachRef, { sessions: updatedSessions });
-                
-                // Update local state for immediate UI feedback
-                 state.coaches[state.selectedCoachId].sessions = updatedSessions;
-                 state.selectedSession = sessionData; // Keep the updated session in state if editing
+                console.log("Session saved successfully to Firestore.");
 
-                // Go back to coach detail view after saving
-                if (state.currentView !== 'coachDetail') {
-                     setState({ currentView: 'coachDetail' });
-                } else {
-                    renderApp(); // Re-render if already on detail view
-                }
+                // Update local state directly AFTER successful save
+                const updatedCoaches = { 
+                    ...state.coaches, 
+                    [state.selectedCoachId]: { ...coachToUpdate, sessions: updatedSessions } 
+                };
+                
+                setState({ 
+                    coaches: updatedCoaches, 
+                    selectedSession: sessionData, // Keep updated session data
+                    currentView: 'coachDetail' // Navigate back
+                });
+
             } catch (error) {
-                console.error("Error saving session: ", error);
+                console.error("Error saving session to Firestore: ", error);
                 alert("Failed to save session feedback. Please check permissions or network.");
             }
         };
         
         window.handleDeleteCoach = async (coachId, coachName) => {
-             if (!state.isAdmin) return; // Only admin can delete
+             if (!state.isAdmin) return; 
              if (confirm(`Are you sure you want to delete ${coachName}? This action cannot be undone.`)) {
                 try {
                     await deleteDoc(doc(db, 'coaches', coachId));
-                    // The onSnapshot listener will automatically update the UI
+                    console.log(`Coach ${coachName} deleted.`);
+                    // onSnapshot will handle UI update
                 } catch (error) {
                     console.error("Error deleting coach:", error);
                     alert("Failed to delete coach. Please try again.");
@@ -217,21 +257,36 @@
         };
 
         window.handleLogout = async () => {
-             // Reset state before signing out to prevent flashing old data
-             setState({ user: null, isAdmin: false, coaches: {}, coachProfileNotFound: false, currentView: 'coachList', loading: false }); 
-            await signOut(auth);
+            console.log("Logging out...");
+            // Reset state immediately for faster UI feedback
+             setState({ user: null, isAdmin: false, coaches: {}, coachProfileNotFound: false, currentView: 'coachList', loading: false, selectedCoachId: null, selectedSession: null, searchQuery: '' }); 
+            try {
+                await signOut(auth);
+                console.log("Sign out successful.");
+                if (unsubscribe) {
+                    console.log("Unsubscribing from Firestore listener.");
+                    unsubscribe(); 
+                    unsubscribe = null;
+                }
+            } catch(error) {
+                console.error("Error signing out:", error);
+            }
         };
         
         window.handleSaveGoals = async () => {
+             if (!state.isAdmin) return; // Only admin saves goals
             const goalsTextarea = document.getElementById('coach-goals-textarea');
-            if (!goalsTextarea) return;
+            if (!goalsTextarea || !state.selectedCoachId) return;
 
             const newGoals = goalsTextarea.value;
             const coachRef = doc(db, 'coaches', state.selectedCoachId);
 
             try {
                 await updateDoc(coachRef, { goals: newGoals });
-                 state.coaches[state.selectedCoachId].goals = newGoals; // Update local state
+                // Update local state directly after successful save
+                 const updatedCoach = { ...state.coaches[state.selectedCoachId], goals: newGoals };
+                 const updatedCoaches = { ...state.coaches, [state.selectedCoachId]: updatedCoach };
+                 setState({ coaches: updatedCoaches }); // Update state to reflect change
                 alert('Goals saved successfully!');
             } catch (error) {
                 console.error("Error saving goals:", error);
@@ -245,15 +300,21 @@
 
         window.handleSaveAthleteFeedback = async () => {
             const feedbackText = document.getElementById('athlete-feedback-textarea').value;
-            const currentSession = state.selectedSession;
+            // Get a fresh copy of the session from state to avoid stale data issues
+            let currentSession = state.selectedSession ? JSON.parse(JSON.stringify(state.selectedSession)) : null; 
+            if (!currentSession) {
+                 console.error("Cannot save athlete feedback, no session selected in state.");
+                 alert("Error: No session is currently selected.");
+                 setState({ currentView: 'coachDetail' }); // Go back safely
+                 return;
+            }
             currentSession.athleteFeedback = feedbackText;
 
-            // Immediately save this change back to the main session data
-            await handleSaveSession(currentSession);
-            // Go back to the session feedback screen
-             // handleSaveSession now handles navigation, update state here
-             state.selectedSession.athleteFeedback = feedbackText;
-             setState({ currentView: 'sessionFeedback' }); 
+            // Save the entire session object back
+            await handleSaveSession(currentSession); 
+            // handleSaveSession now navigates back to coachDetail
+            // We need to ensure the local selectedSession is also updated if needed later
+            // setState({ selectedSession: currentSession }); // Update selected session locally AFTER save if needed
         };
         
         window.handleSearch = (query) => {
@@ -325,19 +386,16 @@
 
 
                     try {
-                        setState({ loading: true }); // Show loading indicator during auth
+                        setState({ loading: true, loadingMessage: isLogin ? "Signing In..." : "Creating Account..." }); 
                         if (isLogin) {
                             await signInWithEmailAndPassword(auth, email, password);
                             // onAuthStateChanged will handle successful login & profile check
                         } else {
-                            // Allow account creation, but profile check happens in onAuthStateChanged
                              if (email.toLowerCase() === ADMIN_EMAIL) {
                                  throw new Error("Cannot sign up with admin email address.");
                              }
                              await createUserWithEmailAndPassword(auth, email, password);
-                             // User is automatically signed in after creation.
-                             // onAuthStateChanged will run, loadDataForUser will check if profile exists.
-                             // If no profile, coachProfileNotFound state will be set.
+                             // User is automatically signed in. onAuthStateChanged handles profile check.
                         }
                     } catch (error) {
                          let userFriendlyError = error.message.replace('Firebase: ','');
@@ -349,9 +407,10 @@
                             userFriendlyError = "Please enter a valid email address.";
                          }
                         errorMsg.textContent = userFriendlyError;
-                        console.error("Auth Error:", error); // Keep detailed error in console
+                        console.error("Auth Error:", error); 
                         setState({ loading: false }); // Hide loading on error
                     } 
+                    // No finally block: onAuthStateChanged handles success and sets loading false
                 });
 
             }, 0);
@@ -364,7 +423,7 @@
                 <header class="bg-white shadow-md p-4 flex justify-between items-center w-full sticky top-0 z-20">
                     <div class="flex items-center">
                         ${onBack ? `<button onclick="${onBack}" class="p-2 mr-4 text-gray-600 hover:text-gray-900 rounded-full hover:bg-gray-100 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
                         </button>` : ''}
                         <h1 class="text-2xl font-bold text-gray-800">${title}</h1>
                     </div>
@@ -373,8 +432,7 @@
         }
         
         function CoachListScreen() {
-             // Should only be rendered for admin
-            if (!state.isAdmin) return document.createElement('div'); 
+            if (!state.isAdmin) return document.createElement('div'); // Safety check
 
             const el = document.createElement('div');
             el.className = 'p-4 md:p-8';
@@ -386,7 +444,6 @@
 
             const filteredCoaches = Object.entries(state.coaches).filter(([id, coach]) => {
                 const query = state.searchQuery.toLowerCase();
-                 // Check if coach and coach.name exist before calling toLowerCase
                 const nameMatch = coach && coach.name && coach.name.toLowerCase().includes(query);
                 const clubMatch = coach && coach.club && coach.club.toLowerCase().includes(query);
                 const emailMatch = coach && coach.email && coach.email.toLowerCase().includes(query);
@@ -406,13 +463,13 @@
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                                 </div>
                                 <div>
-                                    <h3 class="text-lg font-semibold text-gray-900">${coach.name}</h3>
+                                    <h3 class="text-lg font-semibold text-gray-900">${coach.name || 'Unnamed Coach'}</h3>
                                     <p class="text-sm text-gray-600">${coach.club || 'No club assigned'}</p>
                                     <p class="text-xs text-gray-500">${coach.email || 'No email assigned'}</p>
                                     <p class="text-xs text-gray-400 mt-1">${(coach.sessions || []).length} session${(coach.sessions || []).length !== 1 ? 's' : ''} recorded</p>
                                 </div>
                             </div>
-                            <button onclick="handleDeleteCoach('${id}', '${coach.name}')" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors flex-shrink-0">
+                            <button onclick="handleDeleteCoach('${id}', '${coach.name || 'this coach'}')" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors flex-shrink-0">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                             </button>
                         </div>`).join('')}
@@ -427,10 +484,8 @@
         function CoachDetailScreen() {
             const el = document.createElement('div');
             el.className = 'p-4 md:p-8';
-             // Ensure selectedCoachId exists and the coach data is loaded
-            if (!state.selectedCoachId || !state.coaches[state.selectedCoachId]) {
+             if (!state.selectedCoachId || !state.coaches[state.selectedCoachId]) {
                  el.innerHTML = `<p class="text-center text-red-600 mt-10">Error: Could not load coach data.</p>`;
-                 // Add appropriate back/logout buttons based on role
                  if (state.isAdmin) {
                      el.innerHTML += `<div class="text-center mt-4"><button onclick="setState({currentView: 'coachList', selectedCoachId: null})" class="bg-gray-200 p-2 rounded">Back to List</button></div>`;
                  } else {
@@ -446,13 +501,13 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     Edit Profile
                 </button>`;
-                 headerButtons += `<button onclick="handleLogout()" class="ml-2 text-sm bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300">Logout</button>`; // Add logout for admin too
+                 headerButtons += `<button onclick="handleLogout()" class="ml-2 text-sm bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300">Logout</button>`; 
             } else {
                  headerButtons = `<button onclick="handleLogout()" class="text-sm bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300">Logout</button>`;
             }
 
             el.innerHTML = `
-                ${Header({ title: coach.name, onBack: state.isAdmin ? 'handleBack()' : null, rightContent: headerButtons })}
+                ${Header({ title: coach.name || 'Coach Profile', onBack: state.isAdmin ? 'handleBack()' : null, rightContent: headerButtons })}
                 <main class="mt-8">
                     <p class="text-lg font-semibold text-[#00a99d] -mt-4 mb-6">${coach.club || 'No Club Assigned'}</p>
                     
@@ -460,7 +515,6 @@
                         <h2 class="text-2xl font-bold text-gray-800 mb-4">Overall Goals</h2>
                         <textarea id="coach-goals-textarea" ${state.isAdmin ? '' : 'readonly'} class="w-full p-2 border border-gray-300 rounded-md h-32 ${state.isAdmin ? '' : 'bg-gray-100'}" placeholder="${state.isAdmin ? "Enter the coach's long-term development goals..." : "Goals set by admin"}">${coach.goals || ''}</textarea>
                         <div class="flex justify-end mt-4">
-                             <!-- Only Admin can save goals now -->
                             <button onclick="handleSaveGoals()" class="bg-[#002d3c] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#004e69] transition-colors ${state.isAdmin ? '' : 'hidden'}">Save Goals</button> 
                         </div>
                     </div>
@@ -468,7 +522,6 @@
                     <div id="chart-container" class="bg-white p-6 rounded-lg shadow mb-8"></div>
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold text-gray-800">Session History</h2>
-                         <!-- Both admin and coach can add sessions for the viewed coach -->
                         <button onclick="handleNewSession()" class="bg-[#002d3c] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#004e69] transition-colors flex items-center">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                              New Session
@@ -524,6 +577,11 @@
              const el = document.createElement('div');
              el.className = 'p-4 md:p-8';
              const coach = state.coaches[state.selectedCoachId];
+              // Ensure coach exists before proceeding
+             if (!coach) {
+                 el.innerHTML = `<p class="text-red-600">Error: Cannot load session, coach not found.</p>`;
+                 return el;
+             }
              // Deep clone session to avoid modifying state directly during editing
              let session = state.selectedSession ? JSON.parse(JSON.stringify(state.selectedSession)) : {
                 id: `session-${Date.now()}-${Math.random().toString(16).slice(2)}`, 
@@ -639,6 +697,7 @@
                              session.feedback[fbIndex].comments = textarea.value;
                          } 
                     });
+                    // Preserve existing athlete feedback when saving other session details
                      session.athleteFeedback = state.selectedSession?.athleteFeedback || session.athleteFeedback || ''; 
                     handleSaveSession(session);
                 });
@@ -651,6 +710,10 @@
         function AthleteFeedbackScreen() {
             const el = document.createElement('div');
             el.className = 'p-4 md:p-8';
+             if (!state.selectedCoachId || !state.coaches[state.selectedCoachId] || !state.selectedSession) {
+                 el.innerHTML = `<p class="text-red-600">Error: Cannot load feedback screen, missing data.</p>`;
+                 return el;
+             }
             const coach = state.coaches[state.selectedCoachId];
             const session = state.selectedSession;
 
@@ -684,9 +747,9 @@
             const logoutButton = `<button onclick="handleLogout()" class="text-sm bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 mt-6">Logout</button>`;
              el.innerHTML = `
                 <img src="bop-logo.png" alt="Bay of Plenty Rowing Logo" class="w-48 mx-auto mb-6">
-                <h1 class="text-2xl font-bold text-gray-800 mb-2">Profile Not Found</h1>
+                <h1 class="text-2xl font-bold text-gray-800 mb-2">Profile Not Ready</h1>
                 <p class="text-gray-600">Your coach profile has not been created by the administrator yet.</p>
-                <p class="text-gray-600">Please contact ${ADMIN_EMAIL} to have your profile set up.</p>
+                <p class="text-gray-600">Please contact ${ADMIN_EMAIL} to have your profile set up before you can use the app.</p>
                 ${logoutButton}
              `;
              return el;
@@ -697,72 +760,103 @@
         let unsubscribe; // To hold the onSnapshot listener
 
         async function loadDataForUser(user) {
-            if (!user || !user.uid) return;
+            if (!user || !user.uid) {
+                 console.log("loadDataForUser: No user found, proceeding to logout state.");
+                 setState({ user: null, loading: false }); // Ensure loading stops if somehow called without user
+                 return;
+             }
             
-            setState({ loading: true, coachProfileNotFound: false }); // Show loading indicator
+            console.log("loadDataForUser: Loading data for user", user.email);
+            setState({ loading: true, loadingMessage: "Loading coach data...", coachProfileNotFound: false }); 
             
             const isAdmin = user.email === ADMIN_EMAIL;
             let dataQuery;
             
             if (isAdmin) {
-                // Admin: Fetch all coaches
+                console.log("User is Admin, fetching all coaches.");
                 dataQuery = query(collection(db, 'coaches'));
             } else {
-                // Coach: Fetch only their profile linked by email
+                console.log("User is Coach, fetching profile for email:", user.email);
                 dataQuery = query(collection(db, 'coaches'), where("email", "==", user.email));
             }
 
             // Clean up previous listener if exists
-            if (unsubscribe) unsubscribe();
+            if (unsubscribe) {
+                 console.log("Unsubscribing from previous listener.");
+                 unsubscribe();
+                 unsubscribe = null;
+             }
 
+            console.log("Setting up Firestore listener...");
             unsubscribe = onSnapshot(dataQuery, (querySnapshot) => {
+                console.log(`Firestore snapshot received. Admin: ${isAdmin}, Empty: ${querySnapshot.empty}, Size: ${querySnapshot.size}`);
                 const coachesData = {};
                 querySnapshot.forEach((doc) => {
                     coachesData[doc.id] = { id: doc.id, ...doc.data() };
                 });
 
                 if (!isAdmin && querySnapshot.empty) {
-                    // Coach logged in, but their profile doesn't exist yet
+                    console.log("Coach profile not found for email:", user.email);
                     setState({ 
                         isAdmin: false, 
                         coaches: {}, 
                         loading: false, 
                         coachProfileNotFound: true,
-                        currentView: 'coachList' // Ensure view is reset
+                        currentView: 'coachList' 
                     });
                 } else if (!isAdmin && querySnapshot.size === 1) {
-                     // Coach found their profile, set selectedCoachId immediately
                     const coachId = querySnapshot.docs[0].id;
+                    console.log("Coach profile found:", coachId);
                     setState({ 
                         isAdmin: false, 
                         coaches: coachesData, 
                         loading: false, 
                         coachProfileNotFound: false,
-                        selectedCoachId: coachId, // Automatically select their profile
-                        currentView: 'coachDetail' // Go straight to detail view
+                        selectedCoachId: coachId, 
+                        currentView: 'coachDetail' 
                     });
                 }
-                 else {
-                     // Admin or other cases (e.g., multiple profiles found for coach - data issue)
-                    setState({ 
-                        isAdmin: isAdmin, 
-                        coaches: coachesData, 
-                        loading: false, 
-                        coachProfileNotFound: false,
-                        currentView: 'coachList' // Default to list for admin
-                     });
+                 else { // Admin gets all data, or handles coach error case (multiple profiles found)
+                     if (!isAdmin && querySnapshot.size > 1) {
+                         console.warn("Multiple coach profiles found for email:", user.email, "Displaying 'Not Found' screen.");
+                         // Treat as profile not found to prevent unexpected behavior
+                         setState({ 
+                            isAdmin: false, 
+                            coaches: {}, 
+                            loading: false, 
+                            coachProfileNotFound: true,
+                            currentView: 'coachList' 
+                         });
+                     } else { // Admin case
+                        console.log("Admin data loaded:", Object.keys(coachesData).length, "coaches found.");
+                        setState({ 
+                            isAdmin: true, 
+                            coaches: coachesData, 
+                            loading: false, 
+                            coachProfileNotFound: false,
+                            currentView: state.currentView === 'coachList' ? 'coachList' : state.currentView, // Preserve view unless it was default
+                            selectedCoachId: state.selectedCoachId // Preserve selection if any
+                         });
+                     }
                 }
 
             }, (error) => {
-                console.error("Firestore Error: ", error);
-                alert("Could not load data. Check console for an error message.");
-                setState({ loading: false, coachProfileNotFound: false }); // Stop loading on error
+                console.error("Firestore onSnapshot Error: ", error);
+                alert("Could not load coach data. Check console for an error message (potentially Firestore Rules).");
+                // Attempt to gracefully handle error, maybe logout or show limited view
+                 setState({ 
+                    loading: false, 
+                    coachProfileNotFound: false, 
+                    // Consider logging out or showing an error screen instead of just stopping loading
+                    // For now, stop loading and let the UI decide based on user/admin status
+                    currentView: 'coachList' // Reset view
+                 }); 
             });
         }
 
         // --- MODAL & BACKUP/RESTORE HANDLING ---
         window.openCoachModal = (coachId = null) => {
-            if (!state.isAdmin) return; // Only admin can open modal
+            if (!state.isAdmin) return; 
 
             const modal = document.getElementById('coach-modal');
             const title = document.getElementById('modal-title');
@@ -777,10 +871,14 @@
             if (coachId) {
                 // Editing existing coach
                 const coach = state.coaches[coachId];
+                 if (!coach) {
+                     console.error("Cannot open edit modal, coach not found for ID:", coachId);
+                     return;
+                 }
                 title.textContent = 'Edit Coach Profile';
-                nameInput.value = coach.name;
+                nameInput.value = coach.name || '';
                 emailInput.value = coach.email || '';
-                clubSelect.value = coach.club;
+                clubSelect.value = coach.club || clubs[0]; // Default if no club
                 coachIdInput.value = coachId;
             } else {
                 // Adding new coach
@@ -802,7 +900,7 @@
         }
 
         async function saveCoach() {
-             if (!state.isAdmin) return; // Only admin can save
+             if (!state.isAdmin) return; 
 
             const nameInput = document.getElementById('coach-name-input');
             const emailInput = document.getElementById('coach-email-input');
@@ -818,7 +916,6 @@
                 alert("Please enter both coach's name and login email.");
                 return;
             }
-             // Basic email format check
             if (!/^\S+@\S+\.\S+$/.test(email)) {
                 alert("Please enter a valid email address.");
                 return;
@@ -831,12 +928,11 @@
             }
 
             try {
-                 // Check if email is already in use by another coach profile (unless editing the same coach)
                  const q = query(collection(db, "coaches"), where("email", "==", email));
                  const querySnapshot = await getDocs(q);
                  let emailInUse = false;
                  querySnapshot.forEach((doc) => {
-                     if (doc.id !== coachId) { // If email found belongs to a DIFFERENT coach
+                     if (doc.id !== coachId) { 
                          emailInUse = true;
                      }
                  });
@@ -846,23 +942,20 @@
                      return;
                  }
 
-
                 if (coachId) {
-                    // Update existing coach profile
                     const coachRef = doc(db, 'coaches', coachId);
                     await updateDoc(coachRef, { name, email, club });
                      alert('Coach profile updated. Make sure the user account exists in Firebase Authentication.');
                 } else {
-                    // Add new coach profile - Use admin's UID as the creator/manager
                     await addDoc(collection(db, 'coaches'), {
                         name,
-                        email, // Store the coach's login email
+                        email, 
                         club,
                         sessions: [],
                         goals: '', 
                         userId: state.user.uid // Admin's UID is the owner/creator
                     });
-                     alert('Coach profile created. You must now create their login account in the Firebase Authentication console using the email: ' + email);
+                     alert('Coach profile created. The coach can now sign up using this email, or if they already have an account, they can log in.');
                 }
                 closeCoachModal();
             } catch (error) {
@@ -872,106 +965,176 @@
         }
         
         window.handleBackupData = () => {
-             if (!state.isAdmin) return; // Only admin
+             if (!state.isAdmin) return; 
             if (Object.keys(state.coaches).length === 0) {
                 alert("There is no data to back up.");
                 return;
             }
-            const dataStr = JSON.stringify(state.coaches, null, 2);
-            const dataBlob = new Blob([dataStr], {type: "application/json"});
-            const url = URL.createObjectURL(dataBlob);
-            const link = document.createElement('a');
-            const date = new Date().toISOString().split('T')[0];
-            link.download = `boprcf_backup_${date}.json`;
-            link.href = url;
-            link.click();
-            setTimeout(() => URL.revokeObjectURL(url), 100);
+            try {
+                const dataStr = JSON.stringify(state.coaches, null, 2);
+                const dataBlob = new Blob([dataStr], {type: "application/json"});
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                const date = new Date().toISOString().split('T')[0];
+                link.download = `boprcf_backup_${date}.json`;
+                link.href = url;
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+            } catch (error) {
+                console.error("Backup failed:", error);
+                alert("Could not create backup file.");
+            }
         };
 
         window.handleRestoreClick = () => {
-             if (!state.isAdmin) return; // Only admin
+             if (!state.isAdmin) return; 
             document.getElementById('restore-input').click();
         };
 
         async function handleFileSelected(event) {
-             if (!state.isAdmin) return; // Only admin
+             if (!state.isAdmin) return; 
 
             const file = event.target.files[0];
             if (!file) return;
 
             if (!confirm("ADMIN ACTION: Are you sure you want to restore from this file? This will permanently delete ALL current coach data and replace it with the data from the backup. This action cannot be undone.")) {
-                event.target.value = null;
+                event.target.value = null; // Clear selection
                 return;
             }
 
             const reader = new FileReader();
             reader.onload = async (e) => {
+                let initialLoadingState = state.loading; // Store initial state
                 try {
                     const restoredData = JSON.parse(e.target.result);
                     
-                    // Basic validation
                     if (typeof restoredData !== 'object' || restoredData === null) {
-                        throw new Error("Invalid backup file format.");
+                        throw new Error("Invalid backup file format: Root must be an object.");
                     }
+                     // More validation: check if values are objects with expected fields?
+                     // Example: check if first entry has a 'name' field
+                     const firstEntryKey = Object.keys(restoredData)[0];
+                     if (firstEntryKey && typeof restoredData[firstEntryKey].name === 'undefined') {
+                         console.warn("Backup file format might be incorrect. Missing 'name' field in first entry.");
+                         // Decide whether to throw error or proceed cautiously
+                         // throw new Error("Invalid backup file format: Missing 'name' field.");
+                     }
 
-                    setState({ loading: true });
 
-                    // Delete ALL existing coaches (more robust for admin restore)
+                    setState({ loading: true, loadingMessage: "Restoring data..." });
+
+                    // Delete ALL existing coaches 
                     const currentCoachesSnapshot = await getDocs(collection(db, 'coaches'));
                     const deletePromises = currentCoachesSnapshot.docs.map(d => deleteDoc(d.ref));
                     await Promise.all(deletePromises);
+                    console.log("Existing coaches deleted.");
 
                     // Add all coaches from the backup file
                     const addPromises = Object.entries(restoredData).map(([coachId, coachData]) => {
-                         // Ensure userId exists, default to admin's if missing in backup
+                         // Ensure required fields exist, provide defaults
                         const dataToSave = { 
-                            ...coachData, 
-                            userId: coachData.userId || state.user.uid // Use backed up userId or admin's
+                            name: coachData.name || "Unnamed Coach",
+                            email: coachData.email || null, // Allow null email if missing
+                            club: coachData.club || null,
+                            sessions: coachData.sessions || [],
+                            goals: coachData.goals || '', 
+                            userId: coachData.userId || state.user.uid // Default to current admin if missing
                          };
-                        delete dataToSave.id; // Don't save the key as a field
+                        console.log("Restoring coach:", coachId, dataToSave.email);
                         // Use the original ID from the backup file as the document ID
                         return setDoc(doc(db, 'coaches', coachId), dataToSave); 
                     });
                     await Promise.all(addPromises);
 
                     alert("Restore successful! All data has been updated.");
+                    console.log("Restore complete.");
 
                 } catch (error) {
                     console.error("Restore failed:", error);
-                    alert("Restore failed. The backup file may be corrupted or in the wrong format.");
+                    alert(`Restore failed: ${error.message}`);
                 } finally {
-                     // Trigger a fresh load after restore
-                    await loadDataForUser(state.user); // Reload data which also sets loading: false
+                     // Reset loading state after operation (success or fail)
+                     // Re-trigger data load explicitly if needed, otherwise rely on listener if still active
+                     // If listener was detached, need to re-attach
+                    console.log("Restore operation finished. Reloading data...");
+                     // Let onAuthStateChanged handle reloading if user is still logged in
+                     // setState({ loading: false }); // Directly set loading false
+                     // OR Trigger reload manually:
+                     if (state.user) {
+                         loadDataForUser(state.user); // This will set loading=false on completion/error
+                     } else {
+                         setState({ loading: false }); // If somehow user logged out during restore
+                     }
                     event.target.value = null; // Clear file input
                 }
+            };
+            reader.onerror = () => {
+                 alert('Failed to read the backup file.');
+                 event.target.value = null; // Clear file input
             };
             reader.readAsText(file);
         }
 
 
         // --- APP STARTUP ---
+        let initialAuthCheckComplete = false;
+        console.log("Setting up Auth State Listener...");
         onAuthStateChanged(auth, (currentUser) => {
+            console.log("Auth State Changed. Current User:", currentUser ? currentUser.email : "null");
+            initialAuthCheckComplete = true; 
             if (currentUser) {
-                // User is signed in. Check profile existence before setting state.
+                 // User is signed in. Proceed to load data.
                  loadDataForUser(currentUser); 
             } else {
-                // User is signed out.
-                if (unsubscribe) unsubscribe(); // Stop listening to old data
+                // User is signed out or initial state is null.
+                console.log("User is signed out.");
+                if (unsubscribe) {
+                     console.log("Unsubscribing from Firestore listener.");
+                     unsubscribe(); 
+                     unsubscribe = null;
+                }
+                // Reset application state completely and show login screen
                 setState({ 
                     user: null, 
                     isAdmin: false, 
-                    loading: false, 
+                    loading: false, // Ensure loading is false to show login
                     coaches: {}, 
                     coachProfileNotFound: false,
-                    currentView: 'coachList' // Ensure it resets to default/login
+                    currentView: 'coachList', // Reset view
+                    selectedCoachId: null,
+                    selectedSession: null,
+                    searchQuery: ''
                  });
             }
         });
+         // Handle case where listener might not fire immediately
+         setTimeout(() => {
+            if (!initialAuthCheckComplete) {
+                console.warn("Auth state listener did not fire within 2 seconds. Assuming logged out.");
+                 if (!state.user) { // Only update if still no user
+                    setState({ loading: false }); // Force loading off to show login screen
+                 }
+            }
+         }, 2000); // 2 second timeout
 
-        // Attach modal and file input event listeners
-        document.getElementById('save-coach-button').addEventListener('click', saveCoach);
-        document.getElementById('cancel-coach-modal').addEventListener('click', closeCoachModal);
-        document.getElementById('restore-input').addEventListener('change', handleFileSelected);
+
+        // Attach modal and file input event listeners (Ensure DOM is ready)
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOM Loaded. Attaching listeners.");
+            const saveBtn = document.getElementById('save-coach-button');
+            const cancelBtn = document.getElementById('cancel-coach-modal');
+            const restoreInput = document.getElementById('restore-input');
+
+            if (saveBtn) saveBtn.addEventListener('click', saveCoach);
+            else console.error("Save coach button not found");
+
+            if(cancelBtn) cancelBtn.addEventListener('click', closeCoachModal);
+            else console.error("Cancel coach modal button not found");
+
+            if(restoreInput) restoreInput.addEventListener('change', handleFileSelected);
+            else console.error("Restore file input not found");
+        });
+
 
     </script>
 </body>
