@@ -6,6 +6,7 @@
     <title>BOP Rowing Coach Development</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Script tags moved to end of body -->
     <style>
         body { font-family: 'Montserrat', sans-serif; }
         .login-card {
@@ -52,7 +53,7 @@
     
     <input type="file" id="restore-input" class="hidden" accept=".json">
 
-    <!-- Script tags moved here, added prop-types -->
+    <!-- Moved Scripts & Removed defer -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/17.0.2/umd/react.production.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" onerror="console.error('Failed to load React from cdnjs')"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/17.0.2/umd/react-dom.production.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" onerror="console.error('Failed to load ReactDOM from cdnjs')"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" onerror="console.error('Failed to load prop-types from cdnjs')"></script>
@@ -170,6 +171,7 @@
             loading: false, 
             loadingMessage: "Initializing Application...", 
             user: null, // Only admin user will populate this
+            // isAdmin removed, coachProfileNotFound removed
             coaches: {}, 
             currentView: 'coachList', 
             selectedCoachId: null, 
@@ -187,7 +189,6 @@
             let sum = 0;
             let count = 0;
             feedbackArray.forEach(item => {
-                // Ensure score is a number between 0 and 5
                 if (typeof item.score === 'number' && item.score >= 0 && item.score <= 5) {
                     sum += item.score;
                     count++;
@@ -197,7 +198,7 @@
             if (count === 0) return '--';
             
             const average = sum / count;
-            return average.toFixed(1); // Round to one decimal place
+            return average.toFixed(1); 
         }
 
 
@@ -216,32 +217,42 @@
                  return;
             }
             
-            // If auth is ready but no user, show login screen
             if (!state.user) {
                 root.appendChild(LoginScreen());
                 return;
             }
 
-            // User is logged in (must be admin), proceed to render main app views
-            switch(state.currentView) { 
-                case 'coachDetail':
-                    if (state.selectedCoachId && state.coaches[state.selectedCoachId]) {
-                         root.appendChild(CoachDetailScreen());
-                    } else {
-                         console.warn("Attempted to render detail view without valid selected coach, redirecting to list.");
-                         setState({ currentView: 'coachList', selectedCoachId: null }); 
-                    }
-                    break;
-                case 'sessionFeedback':
-                    root.appendChild(SessionFeedbackScreen());
-                    break;
-                case 'athleteFeedback':
-                    root.appendChild(AthleteFeedbackScreen());
-                    break;
-                case 'coachList': 
-                default:
-                     root.appendChild(CoachListScreen());
-                    break;
+            // Wrap main rendering logic in try...catch
+            try {
+                switch(state.currentView) { 
+                    case 'coachDetail':
+                        if (state.selectedCoachId && state.coaches[state.selectedCoachId]) {
+                             root.appendChild(CoachDetailScreen());
+                        } else {
+                             console.warn("Attempted to render detail view without valid selected coach, redirecting to list.");
+                             setState({ currentView: 'coachList', selectedCoachId: null }); 
+                        }
+                        break;
+                    case 'sessionFeedback':
+                        root.appendChild(SessionFeedbackScreen());
+                        break;
+                    case 'athleteFeedback':
+                        root.appendChild(AthleteFeedbackScreen());
+                        break;
+                    case 'coachList': 
+                    default:
+                         root.appendChild(CoachListScreen());
+                        break;
+                }
+            } catch (error) {
+                console.error("Error during renderApp switch:", error);
+                root.innerHTML = `<div class="p-8 text-center text-red-500">An error occurred while rendering the page. Check the console.</div>`;
+                // Optionally add a logout button here too
+                const logoutBtn = document.createElement('button');
+                logoutBtn.textContent = 'Logout';
+                logoutBtn.className = 'mt-4 bg-gray-200 p-2 rounded';
+                logoutBtn.onclick = handleLogout;
+                root.appendChild(logoutBtn);
             }
         }
         
@@ -262,7 +273,6 @@
             if (state.currentView === 'sessionFeedback') setState({ currentView: 'coachDetail' });
             else if (state.currentView === 'athleteFeedback') setState({ currentView: 'sessionFeedback' });
             else if (state.currentView === 'coachDetail') {
-                 // Only admin can be on detail view, goes back to list
                  setState({ currentView: 'coachList', selectedCoachId: null });
             }
         };
@@ -273,7 +283,6 @@
             const coachToUpdate = state.coaches[state.selectedCoachId]; 
             if (!coachToUpdate) return; 
 
-            // Ensure session feedback array matches current rubric structure
             const updatedFeedback = Object.keys(rubricData).map(cat => {
                 const existingFeedback = (sessionData.feedback || []).find(f => f.category === cat);
                 return existingFeedback || { category: cat, score: null, comments: '' }; 
@@ -292,7 +301,6 @@
             try {
                 await updateDoc(coachRef, { sessions: updatedSessions });
                 console.log("Session saved successfully.");
-                // Update local state is handled by Firestore listener generally, but force immediate update for navigation
                  const updatedCoaches = { ...state.coaches, [state.selectedCoachId]: { ...coachToUpdate, sessions: updatedSessions } };
                  setState({ coaches: updatedCoaches, selectedSession: sessionData, currentView: 'coachDetail' }); 
 
@@ -303,7 +311,6 @@
         };
         
         window.handleDeleteCoach = async (coachId, coachName) => {
-             // Admin check implied as only admin sees the delete button
              if (confirm(`Are you sure you want to delete ${coachName}? This action cannot be undone.`)) {
                 try {
                     await deleteDoc(doc(db, 'coaches', coachId));
@@ -410,7 +417,8 @@
                     <div class="space-y-4 text-left">
                         <div>
                            <label for="email" class="block text-sm font-medium text-gray-700">Email Address</label>
-                           <input id="email" type="email" required value="${ADMIN_EMAIL}" readonly class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-gray-100"> 
+                           <!-- Make email editable again -->
+                           <input id="email" type="email" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-[#00a99d] focus:border-[#00a99d]"> 
                         </div>
                         <div>
                            <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
@@ -431,9 +439,15 @@
                 const errorMsg = el.querySelector('#error-message');
 
                 button.addEventListener('click', async () => {
-                    const email = ADMIN_EMAIL; 
+                    const email = emailInput.value; // Read from input
                     const password = passwordInput.value;
                     errorMsg.textContent = ''; 
+
+                     // Check if entered email is the admin email
+                     if (email.toLowerCase() !== ADMIN_EMAIL) {
+                         errorMsg.textContent = 'Invalid admin email address.';
+                         return;
+                     }
 
                     if (!password) {
                         errorMsg.textContent = "Please enter the password.";
@@ -445,12 +459,15 @@
                     errorMsg.textContent = ''; 
 
                     try {
-                        await signInWithEmailAndPassword(auth, email, password);
+                        await signInWithEmailAndPassword(auth, email, password); // Use entered email
                     } catch (error) {
                         let userFriendlyError = "Invalid password."; 
                          if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
                             userFriendlyError = "Invalid password.";
-                         } else {
+                         } else if (error.code === 'auth/user-not-found') {
+                            userFriendlyError = "Admin account not found."; // More specific if needed
+                         }
+                          else {
                              userFriendlyError = "Login failed. Please try again."; 
                          }
                         errorMsg.textContent = userFriendlyError;
@@ -460,11 +477,19 @@
                     } 
                 });
                 
-                 passwordInput.focus();
+                 // Add focus to email field first
+                 emailInput.focus(); 
+                 // Allow Enter key from password field
                  passwordInput.addEventListener('keyup', (event) => {
                      if (event.key === 'Enter') {
                          button.click();
                      }
+                 });
+                 // Allow Enter key from email field to move to password
+                 emailInput.addEventListener('keyup', (event) => {
+                      if (event.key === 'Enter') {
+                          passwordInput.focus();
+                      }
                  });
 
 
@@ -478,7 +503,7 @@
                 <header class="bg-white shadow-md p-4 flex justify-between items-center w-full sticky top-0 z-20">
                     <div class="flex items-center">
                         ${onBack ? `<button onclick="handleBack()" class="p-2 mr-4 text-gray-600 hover:text-gray-900 rounded-full hover:bg-gray-100 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
                         </button>` : ''}
                         <h1 class="text-2xl font-bold text-gray-800">${title}</h1>
                     </div>
@@ -512,7 +537,7 @@
                         <div class="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow flex items-center justify-between space-x-4">
                            <div class="flex items-center space-x-4 cursor-pointer flex-grow" onclick="handleSelectCoach('${id}')">
                                 <div class="bg-[#00a99d] rounded-full p-3 text-white flex-shrink-0">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                                 </div>
                                 <div>
                                     <h3 class="text-lg font-semibold text-gray-900">${coach.name || 'Unnamed Coach'}</h3>
@@ -575,7 +600,7 @@
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         ${(coach.sessions || []).length > 0 ? (coach.sessions || []).sort((a,b) => new Date(b.date) - new Date(a.date)).map(session => {
-                            const avgScore = calculateAverageScore(session.feedback); // Calculate average
+                            const avgScore = calculateAverageScore(session.feedback); 
                             return `
                             <div onclick='handleSelectSession(${JSON.stringify(session)})' class="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer">
                                 <p class="font-semibold text-gray-900">Session: ${new Date(session.date).toLocaleDateString('en-NZ', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
@@ -671,7 +696,6 @@
                  el.innerHTML = `<p class="text-red-600">Error: Cannot load session, coach not found.</p>`;
                  return el;
              }
-             // Deep clone session to avoid modifying state directly during editing
              let session = state.selectedSession ? JSON.parse(JSON.stringify(state.selectedSession)) : {
                 id: `session-${Date.now()}-${Math.random().toString(16).slice(2)}`, 
                 date: new Date().toISOString().split('T')[0], 
@@ -681,7 +705,6 @@
                 actionPlan: '', 
                 athleteFeedback: ''
              };
-              // Ensure feedback array exists and matches rubric
              if (!session.feedback || session.feedback.length !== Object.keys(rubricData).length) {
                 session.feedback = Object.keys(rubricData).map(cat => {
                     const existing = (session.feedback || []).find(f => f.category === cat);
@@ -707,8 +730,7 @@
                        </button>`
                     : `<button onclick="handleGetAthleteFeedback()" class="bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors">Get Athlete Feedback</button>`;
 
-                // Calculate initial average score
-                 const initialAvgScore = calculateAverageScore(session.feedback);
+                const initialAvgScore = calculateAverageScore(session.feedback);
 
                  const feedbackHTML = session.feedback ? Object.entries(rubricData).map(([category, data]) => {
                         const currentFeedback = session.feedback.find(f => f.category === category) || { score: null, comments: "" };
@@ -764,7 +786,6 @@
 
                 formContainer.innerHTML = formHTML;
 
-                 // Function to update average score display
                  const updateAverageDisplay = () => {
                      const avgScoreSpan = document.getElementById('session-avg-score');
                      if (avgScoreSpan) {
@@ -794,7 +815,6 @@
                             b.classList.toggle('font-bold', parseInt(b.dataset.score) === score);
                             b.classList.toggle('bg-gray-200', parseInt(b.dataset.score) !== score);
                         });
-                        // Recalculate and update average display
                          updateAverageDisplay(); 
                     });
                 });
@@ -826,7 +846,6 @@
         }
 
         function AthleteFeedbackScreen() {
-             // ... (AthleteFeedbackScreen remains the same) ...
              const el = document.createElement('div');
             el.className = 'p-4 md:p-8';
              if (!state.selectedCoachId || !state.coaches[state.selectedCoachId] || !state.selectedSession) {
@@ -860,16 +879,14 @@
             return el;
         }
         
-        function CoachNotFoundScreen() {
-            // ... (CoachNotFoundScreen remains the same) ...
+        function CoachNotFoundScreen() { // Should not be reached in single-user mode, but kept as safety
             const el = document.createElement('div');
             el.className = 'p-4 md:p-8 flex flex-col items-center justify-center h-screen text-center';
             const logoutButton = `<button onclick="handleLogout()" class="text-sm bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 mt-6">Logout</button>`;
              el.innerHTML = `
                 <img src="bop-logo.png" alt="Bay of Plenty Rowing Logo" class="w-48 mx-auto mb-6">
-                <h1 class="text-2xl font-bold text-gray-800 mb-2">Profile Not Ready</h1>
-                <p class="text-gray-600">Your coach profile has not been created by the administrator yet.</p>
-                <p class="text-gray-600">Please contact ${ADMIN_EMAIL} to have your profile set up before you can use the app.</p>
+                <h1 class="text-2xl font-bold text-red-600 mb-2">Error</h1>
+                <p class="text-gray-600">An unexpected error occurred. Please try logging out and back in.</p>
                 ${logoutButton}
              `;
              return el;
@@ -972,11 +989,10 @@
             try {
                 if (coachId) { // Editing
                     const coachRef = doc(db, 'coaches', coachId);
-                    // Removed email from update
                     await updateDoc(coachRef, { name, club });
                      alert('Coach updated.');
                 } else { // Adding
-                    // Use admin's UID for the userId field, removed email
+                    // Use admin's UID for the userId field
                     await addDoc(collection(db, 'coaches'), {
                         name, club,
                         sessions: [], goals: '', 
@@ -1018,7 +1034,7 @@
                     console.log("Existing coaches deleted.");
 
                     const addPromises = Object.entries(restoredData).map(([coachId, coachData]) => {
-                        // Ensure essential fields and use logged-in admin's UID, remove email
+                        // Ensure essential fields and use logged-in admin's UID
                         const dataToSave = { 
                             name: coachData.name || "Unnamed Coach",
                             club: coachData.club || null,
